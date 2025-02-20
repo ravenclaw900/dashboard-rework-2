@@ -1,0 +1,24 @@
+[package]
+name = "server"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bitcode.workspace = true
+config = { workspace = true, features = ["frontend"] }
+flexible-hyper-server-tls = { version = "0.5.0", default-features = false, features = ["ring", "rustls_helpers"] }
+getrandom = "0.3.1"
+http-body-util = "0.1.2"
+hyper = "1.5.0"
+include_dir = "0.7.4"
+log.workspace = true
+maud = "0.26.0"
+pretty-bytes-typed = "0.2.0"
+proto.workspace = true
+serde.workspace = true
+serde_urlencoded = "0.7.1"
+simple_logger.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }

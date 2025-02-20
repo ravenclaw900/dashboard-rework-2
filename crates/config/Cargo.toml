@@ -1,0 +1,17 @@
+[package]
+name = "config"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+frontend = []
+backend = []
+
+[dependencies]
+log.workspace = true
+serde.workspace = true
+toml_edit = { version = "0.22.22", features = ["serde"] }
+toml-migrate = "0.1.0"
+anyhow.workspace = true

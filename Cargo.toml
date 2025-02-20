@@ -1,0 +1,27 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.7.0"
+authors = ["ravenclaw900 <ravenclaw900@proton.me>"]
+edition = "2021"
+license = "GPL-3.0"
+
+[workspace.dependencies]
+config = { path = "./crates/config" }
+proto = { path = "./crates/proto" }
+
+anyhow = "1.0.93"
+bitcode = "0.6.3"
+log = { version = "0.4.22", features = ["serde"] }
+serde = { version = "1.0.210", features = ["derive"] }
+simple_logger = "5.0.0"
+tokio = "1.40.0"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = "fat"
+strip = true
+opt-level = "s"

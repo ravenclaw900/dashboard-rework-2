@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use backend::{BackendRegistry, BackendServer};
-use config::{frontend::get_config, VERSION};
+use config::{VERSION, frontend::get_config};
 use http::{HttpServer, TlsConfig};
 use log::info;
 use simple_logger::SimpleLogger;

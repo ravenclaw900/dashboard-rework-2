@@ -1,8 +1,8 @@
-use maud::{html, Markup, Render, DOCTYPE};
+use maud::{DOCTYPE, Markup, Render, html};
 
 use crate::http::{
-    request::{BackendData, ServerRequest},
-    response::{html, ServerResponse},
+    request::BackendData,
+    response::{ServerResponse, html},
 };
 
 pub fn template(

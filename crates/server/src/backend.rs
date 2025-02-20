@@ -7,8 +7,8 @@ use std::{
 use anyhow::{Context, Result};
 use log::{error, info, warn};
 use proto::{
-    types::{Handshake, Request},
     DashboardSocket, Frame,
+    types::{Handshake, Request},
 };
 use tokio::{
     net::{TcpListener, TcpStream},

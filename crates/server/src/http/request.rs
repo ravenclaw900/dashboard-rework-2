@@ -4,11 +4,11 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use hyper::{body::Incoming, header, StatusCode};
+use hyper::{StatusCode, body::Incoming, header};
 
 use crate::backend::{BackendHandle, SharedBackendRegistry};
 
-use super::response::{full_with_status, ServerResponse};
+use super::response::{ServerResponse, full_with_status};
 
 pub type HyperRequest = hyper::Request<Incoming>;
 

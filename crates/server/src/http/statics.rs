@@ -1,8 +1,8 @@
-use include_dir::{include_dir, Dir};
+use include_dir::{Dir, include_dir};
 
 use super::{
     request::ServerRequest,
-    response::{full_with_mime, not_found, ServerResponse},
+    response::{ServerResponse, full_with_mime, not_found},
 };
 
 static ASSETS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");

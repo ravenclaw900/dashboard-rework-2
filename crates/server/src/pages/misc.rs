@@ -1,6 +1,6 @@
 use crate::http::{
     request::ServerRequest,
-    response::{set_cookie, ServerResponse},
+    response::{ServerResponse, set_cookie},
 };
 
 #[derive(Clone, serde::Deserialize)]

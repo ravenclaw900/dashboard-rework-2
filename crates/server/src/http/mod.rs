@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use flexible_hyper_server_tls::{rustls_helpers, HttpOrHttpsAcceptor};
+use flexible_hyper_server_tls::{HttpOrHttpsAcceptor, rustls_helpers};
 use hyper::service::service_fn;
 use log::{error, info};
 use request::ServerRequest;

@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use client::BackendClient;
-use config::{backend::get_config, VERSION};
+use config::{VERSION, backend::get_config};
 use log::{error, info};
 use simple_logger::SimpleLogger;
 use sysinfo::System;

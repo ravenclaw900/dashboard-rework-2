@@ -4,7 +4,7 @@ use proto::types::{Request, SystemResponse};
 
 use crate::http::{
     request::{BackendData, ServerRequest},
-    response::{html, ServerResponse},
+    response::{ServerResponse, html},
 };
 
 use super::template::template;

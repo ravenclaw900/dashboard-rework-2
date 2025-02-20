@@ -5,8 +5,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use proto::{
-    types::{Handshake, Request},
     DashboardSocket, Frame,
+    types::{Handshake, Request},
 };
 use sysinfo::System;
 use tokio::{net::TcpStream, sync::mpsc};

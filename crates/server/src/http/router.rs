@@ -1,10 +1,9 @@
-use hyper::{Method, StatusCode};
+use hyper::Method;
 
-use crate::backend::SharedBackendRegistry;
 use crate::pages;
 
-use super::request::{extract_backends, extract_query, BackendData, HyperRequest};
-use super::response::{full_with_status, not_found, redirect, RedirectType, ServerResponse};
+use super::request::{extract_backends, extract_query};
+use super::response::{RedirectType, ServerResponse, not_found, redirect};
 use super::{request::ServerRequest, statics};
 
 const GET: &Method = &Method::GET;

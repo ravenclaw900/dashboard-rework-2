@@ -1,8 +1,8 @@
 use http_body_util::Full;
 use hyper::{
+    Response, StatusCode,
     body::Bytes,
     header::{self},
-    Response, StatusCode,
 };
 
 pub type ServerResponse = hyper::Response<Full<Bytes>>;

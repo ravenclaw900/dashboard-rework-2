@@ -167,6 +167,10 @@ header {
     font-size: var(--font-size-2);
 }
 
+footer {
+    grid-area: foot;
+}
+
 nav {
     grid-area: nav;
 

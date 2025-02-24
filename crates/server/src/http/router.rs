@@ -38,7 +38,7 @@ pub async fn router(mut req: ServerRequest) -> Result<ServerResponse, std::conve
     let resp = router!(req, path_segments, {
         (GET, ["static", ..]) => ([], statics::static_file),
 
-        (GET, []) => ([], |_| async { redirect(RedirectType::Permanent, "/system") }),
+        (GET, []) => ([], async |_| { redirect(RedirectType::Permanent, "/system") }),
 
         (GET, ["system"]) => ([extract_backends], pages::system::page),
         (GET, ["system", "meters"]) => ([extract_backends], pages::system::meters),

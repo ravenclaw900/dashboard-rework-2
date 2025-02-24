@@ -1,7 +1,7 @@
-// Polling and multiple events
 document.addEventListener("fx:init", (evt) => {
     let elt = evt.target;
 
+    // Polling
     let interval = elt.getAttribute("ext-fx-poll-interval");
     if (interval) {
         setInterval(
@@ -10,6 +10,7 @@ document.addEventListener("fx:init", (evt) => {
         );
     }
 
+    // Listening for multiple events
     let triggers = (elt.getAttribute("ext-fx-multi-trigger") ?? "").split(" ");
     triggers.forEach(
         (trigger) => elt.addEventListener(trigger, () => elt.dispatchEvent(new CustomEvent("multi")))
@@ -22,7 +23,7 @@ document.addEventListener("fx:after", (evt) => {
     if (!cfg.response.ok) {
         cfg.text = `Error: ${cfg.response.statusText}: ${cfg.text}`;
         cfg.target = document.querySelector("main");
-        cfg.swap = "innerHTML"
+        cfg.swap = "innerHTML";
     }
 })
 

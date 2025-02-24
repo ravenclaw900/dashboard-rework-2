@@ -55,7 +55,9 @@ pub fn template(
                     (content)
                 }
 
-                script src="/static/fixi-0.6.3.js" {}
+                footer {}
+
+                script src="/static/fixi-0.6.4.js" {}
                 script src="/static/ext-fixi.js" {}
             }
         }

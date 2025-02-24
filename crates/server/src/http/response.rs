@@ -1,9 +1,5 @@
 use http_body_util::Full;
-use hyper::{
-    Response, StatusCode,
-    body::Bytes,
-    header::{self},
-};
+use hyper::{Response, StatusCode, body::Bytes, header};
 
 pub type ServerResponse = hyper::Response<Full<Bytes>>;
 
@@ -51,7 +47,10 @@ pub fn redirect(typ: RedirectType, path: &str) -> ServerResponse {
     let (status, header) = match typ {
         RedirectType::Permanent => (StatusCode::PERMANENT_REDIRECT, header::LOCATION),
         RedirectType::SeeOther => (StatusCode::SEE_OTHER, header::LOCATION),
-        // RedirectType::Fixi => (StatusCode::OK, HeaderName::from_static("fx-redirect")),
+        // RedirectType::Fixi => (
+        //     StatusCode::OK,
+        //     const { HeaderName::from_static("fx-redirect") },
+        // ),
     };
 
     Response::builder()

@@ -41,8 +41,7 @@ impl HttpServer {
             .await
             .context("failed to bind http server")?;
 
-        let mut acceptor = HttpOrHttpsAcceptor::new(listener)
-            .with_err_handler(|err| error!("Error serving HTTP connection: {err}"));
+        let mut acceptor = HttpOrHttpsAcceptor::new(listener);
 
         if let Some(tls_config) = tls_config {
             let tls = rustls_helpers::get_tlsacceptor_from_files(
@@ -58,16 +57,22 @@ impl HttpServer {
         Ok(Self { acceptor, backends })
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(self) {
         loop {
             let backends = self.backends.clone();
 
-            self.acceptor
-                .accept(service_fn(move |req| {
-                    let req = ServerRequest::new(req, backends.clone());
-                    async move { router(req).await }
-                }))
-                .await;
+            let service = service_fn(move |req| {
+                let req = ServerRequest::new(req, backends.clone());
+                async move { router(req).await }
+            });
+
+            if let Ok((_, conn_fut)) = self.acceptor.accept(service).await {
+                tokio::task::spawn_local(async move {
+                    if let Err(err) = conn_fut.await {
+                        error!("Error serving HTTP connection: {err}");
+                    }
+                });
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::io;
+use anyhow::{Context, Result, anyhow};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -7,27 +7,9 @@ pub mod types;
 const HEADER_LEN: usize = 4;
 const MAX_FRAME_LEN: usize = 8192;
 
-pub struct Frame {
-    id: u16,
-    data: Vec<u8>,
-}
-
-impl Frame {
-    pub fn from_encode<T: bitcode::Encode>(id: u16, val: &T) -> Self {
-        let data = bitcode::encode(val);
-
-        Self { id, data }
-    }
-
-    pub fn into_decode<T: bitcode::DecodeOwned>(self) -> Result<(u16, T), bitcode::Error> {
-        let val = bitcode::decode(&self.data)?;
-
-        Ok((self.id, val))
-    }
-
-    pub fn into_data(self) -> (u16, Vec<u8>) {
-        (self.id, self.data)
-    }
+pub trait FrameData: Sized {
+    fn from_data(id: u16, data: &[u8]) -> Result<Self, bitcode::Error>;
+    fn to_data(&self) -> (u16, Vec<u8>);
 }
 
 pub struct DashboardSocket {
@@ -43,7 +25,7 @@ impl DashboardSocket {
         }
     }
 
-    fn parse_frame(&mut self) -> Result<Option<Frame>, io::Error> {
+    fn parse_frame<F: FrameData>(&mut self) -> Result<Option<F>> {
         // If there aren't even enough bytes for the header, return immediately
         if self.buf.len() < HEADER_LEN {
             return Ok(None);
@@ -53,12 +35,8 @@ impl DashboardSocket {
         let frame_len = u16::from_be_bytes(self.buf[2..4].try_into().unwrap()) as usize;
 
         if frame_len > MAX_FRAME_LEN {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "frame of len {} is greater than max frame len {}",
-                    frame_len, MAX_FRAME_LEN
-                ),
+            return Err(anyhow!(
+                "frame of len {frame_len} is greater than max frame len {MAX_FRAME_LEN}"
             ));
         }
 
@@ -70,15 +48,17 @@ impl DashboardSocket {
         }
 
         // Get frame data specifically as a vec
-        let data = self.buf[HEADER_LEN..HEADER_LEN + frame_len].to_vec();
+        let data = &self.buf[HEADER_LEN..HEADER_LEN + frame_len];
+
+        let frame = F::from_data(id, data).context("failed to decode frame data")?;
 
         // Remove header and frame data from buffer
         self.buf.drain(..HEADER_LEN + frame_len);
 
-        Ok(Some(Frame { id, data }))
+        Ok(Some(frame))
     }
 
-    pub async fn read_frame(&mut self) -> Result<Option<Frame>, io::Error> {
+    pub async fn read_frame<F: FrameData>(&mut self) -> Result<Option<F>> {
         loop {
             if let Some(frame) = self.parse_frame()? {
                 return Ok(Some(frame));
@@ -92,33 +72,31 @@ impl DashboardSocket {
                 if self.buf.is_empty() {
                     return Ok(None);
                 } else {
-                    return Err(io::Error::new(
-                        io::ErrorKind::ConnectionReset,
-                        "connection reset by peer",
-                    ));
+                    return Err(anyhow!("connection reset by peer"));
                 }
             }
         }
     }
 
-    pub async fn write_frame(&mut self, mut frame: Frame) -> Result<(), io::Error> {
-        if frame.data.len() > MAX_FRAME_LEN {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "frame of len {} is greater than max frame len {}",
-                    frame.data.len(),
-                    MAX_FRAME_LEN
-                ),
+    pub async fn write_frame<F: FrameData>(&mut self, frame: F) -> Result<()> {
+        let (id, mut data) = frame.to_data();
+
+        if data.len() > MAX_FRAME_LEN {
+            return Err(anyhow!(
+                "frame of len {} is greater than max frame len {MAX_FRAME_LEN}",
+                data.len()
             ));
         }
 
-        let mut write_buf = Vec::with_capacity(HEADER_LEN + frame.data.len());
+        let mut write_buf = Vec::with_capacity(HEADER_LEN + data.len());
 
-        write_buf.extend_from_slice(&frame.id.to_be_bytes());
-        write_buf.extend_from_slice(&(frame.data.len() as u16).to_be_bytes());
-        write_buf.append(&mut frame.data);
+        write_buf.extend_from_slice(&id.to_be_bytes());
+        write_buf.extend_from_slice(&(data.len() as u16).to_be_bytes());
+        write_buf.append(&mut data);
 
-        self.stream.write_all(&write_buf).await
+        self.stream
+            .write_all(&write_buf)
+            .await
+            .context("failed to write frame to socket")
     }
 }

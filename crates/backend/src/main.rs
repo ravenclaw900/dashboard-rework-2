@@ -13,7 +13,6 @@ mod getters;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let config = get_config().context("failed to get config")?;
-    let config = Box::leak(Box::new(config));
 
     SimpleLogger::new()
         .with_level(config.log_level)
@@ -27,7 +26,12 @@ async fn main() -> Result<()> {
     let system = Arc::new(Mutex::new(System::new()));
 
     loop {
-        let client = BackendClient::new(config.frontend_addr, system.clone()).await?;
+        let client = BackendClient::new(
+            config.frontend_addr,
+            config.nickname.clone(),
+            system.clone(),
+        )
+        .await?;
 
         if let Err(err) = client.run().await {
             error!("Connection error: {err:#}");

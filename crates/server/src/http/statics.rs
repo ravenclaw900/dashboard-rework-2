@@ -1,33 +1,20 @@
-use include_dir::{Dir, include_dir};
+use hyper::header;
 
-use super::{
-    request::ServerRequest,
-    response::{ServerResponse, full_with_mime, not_found},
-};
+use super::{request::ServerRequest, response::ServerResponse};
 
-static ASSETS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/static");
+macro_rules! static_file {
+    ($name:ident, $path:literal, $mime:literal) => {
+        pub async fn $name(_req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+            let file = include_bytes!($path);
 
-fn get_mime_type(ext: &str) -> &str {
-    match ext {
-        "js" => "text/javascript;charset=UTF-8",
-        "css" => "text/css;charset=UTF-8",
-        "svg" => "image/svg+xml",
-        _ => unreachable!(),
-    }
-}
-
-pub async fn static_file(req: ServerRequest) -> ServerResponse {
-    let path = req.uri().path().trim_start_matches("/static/");
-
-    let Some(file) = ASSETS.get_file(path) else {
-        return not_found();
+            Ok(ServerResponse::new()
+                .header(header::CONTENT_TYPE, $mime)
+                .header(header::CONTENT_ENCODING, "gzip")
+                .body(&file[..]))
+        }
     };
-
-    // Unwraps are safe here because every static file has an extension that is valid UTF-8
-    let ext = file.path().extension().unwrap();
-    let ext = ext.to_str().unwrap();
-
-    let mime = get_mime_type(ext);
-
-    full_with_mime(file.contents(), mime)
 }
+
+static_file!(js, "../../dist/main.js", "text/javascript;charset=UTF-8");
+static_file!(css, "../../dist/main.css", "text/css;charset=UTF-8");
+static_file!(icons, "../../dist/icons.svg", "image/svg+xml");

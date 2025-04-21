@@ -151,16 +151,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ephemeropt"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c1ddca76720c92d14dc39fac8b1ad3aab6bf77503eb5f6d786576e5215858d9"
+
+[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
-name = "flexible-hyper-server-tls"
-version = "0.5.0"
+name = "fastrand"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6f553981b11463eabda29251d674570fac1bcb1fea34b4411a05fcf2ca36d02"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
+name = "flexible-hyper-server-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce06a2bb3e3c54f4981993982f1b77e97fbd9d46dc54208e89755126ba19bbb"
 dependencies = [
  "hyper",
  "hyper-util",
@@ -337,25 +349,6 @@ dependencies = [
  "hyper",
  "pin-project-lite",
  "tokio",
-]
-
-[[package]]
-name = "include_dir"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
-dependencies = [
- "include_dir_macros",
-]
-
-[[package]]
-name = "include_dir_macros"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cab85a7ed0bd5f0e76d93846e0147172bed2e2d3f859bcc33a8d9699cad1a75"
-dependencies = [
- "proc-macro2",
- "quote",
 ]
 
 [[package]]
@@ -548,6 +541,7 @@ dependencies = [
 name = "proto"
 version = "0.7.0"
 dependencies = [
+ "anyhow",
  "bitcode",
  "tokio",
 ]
@@ -667,11 +661,12 @@ dependencies = [
  "anyhow",
  "bitcode",
  "config",
+ "ephemeropt",
+ "fastrand",
  "flexible-hyper-server-tls",
  "getrandom 0.3.1",
  "http-body-util",
  "hyper",
- "include_dir",
  "log",
  "maud",
  "pretty-bytes-typed",

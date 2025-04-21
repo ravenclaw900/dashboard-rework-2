@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+./scripts/build-assets.bash
+
 cargo build --bins
 
 ./target/debug/server &

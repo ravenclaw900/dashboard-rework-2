@@ -1,61 +1,63 @@
 use http_body_util::Full;
-use hyper::{Response, StatusCode, body::Bytes, header};
+use hyper::{
+    StatusCode,
+    body::Bytes,
+    header::{self, HeaderName, HeaderValue},
+    http::response::Builder as ResponseBuilder,
+};
 
-pub type ServerResponse = hyper::Response<Full<Bytes>>;
-
-pub fn full_with_status<T: Into<Bytes>>(body: T, code: StatusCode) -> ServerResponse {
-    let body = Full::from(body.into());
-
-    Response::builder().status(code).body(body).unwrap()
+pub struct ServerResponse {
+    builder: ResponseBuilder,
+    body: Bytes,
 }
-
-pub fn full_with_mime<T: Into<Bytes>>(body: T, mime: &str) -> ServerResponse {
-    let body = Full::from(body.into());
-
-    Response::builder()
-        .header(header::CONTENT_TYPE, mime)
-        .body(body)
-        .unwrap()
-}
-
-pub fn html<T: Into<Bytes>>(body: T) -> ServerResponse {
-    full_with_mime(body, "text/html;charset=UTF-8")
-}
-
-pub fn not_found() -> ServerResponse {
-    full_with_status("page not found", StatusCode::NOT_FOUND)
-}
-
-pub fn set_cookie(name: &str, val: &str, max_age: Option<u64>) -> ServerResponse {
-    // Default of roughly 31 years
-    let max_age = max_age.unwrap_or(999999999);
-
-    let cookie_val = format!("{name}={val}; Path=/; SameSite=Lax; Max-Age={max_age}");
-    Response::builder()
-        .header(header::SET_COOKIE, cookie_val)
-        .body(Full::from(""))
-        .unwrap()
-}
+pub type BuiltResponse = hyper::Response<Full<Bytes>>;
 
 pub enum RedirectType {
     Permanent,
     SeeOther,
-    // Fixi,
 }
 
-pub fn redirect(typ: RedirectType, path: &str) -> ServerResponse {
-    let (status, header) = match typ {
-        RedirectType::Permanent => (StatusCode::PERMANENT_REDIRECT, header::LOCATION),
-        RedirectType::SeeOther => (StatusCode::SEE_OTHER, header::LOCATION),
-        // RedirectType::Fixi => (
-        //     StatusCode::OK,
-        //     const { HeaderName::from_static("fx-redirect") },
-        // ),
-    };
+impl ServerResponse {
+    pub fn new() -> Self {
+        Self {
+            builder: ResponseBuilder::new(),
+            body: Bytes::new(),
+        }
+    }
 
-    Response::builder()
-        .status(status)
-        .header(header, path)
-        .body(Full::from(""))
-        .unwrap()
+    pub fn status(mut self, status: StatusCode) -> Self {
+        self.builder = self.builder.status(status);
+        self
+    }
+
+    pub fn header<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: TryInto<HeaderName>,
+        K::Error: Into<hyper::http::Error>,
+        V: TryInto<HeaderValue>,
+        V::Error: Into<hyper::http::Error>,
+    {
+        self.builder = self.builder.header(key, value);
+        self
+    }
+
+    pub fn redirect(self, typ: RedirectType, path: &str) -> Self {
+        let status = match typ {
+            RedirectType::Permanent => StatusCode::PERMANENT_REDIRECT,
+            RedirectType::SeeOther => StatusCode::SEE_OTHER,
+        };
+
+        self.status(status).header(header::LOCATION, path)
+    }
+
+    pub fn body<T: Into<Bytes>>(mut self, body: T) -> Self {
+        self.body = body.into();
+        self
+    }
+
+    pub fn build(self) -> BuiltResponse {
+        let body = Full::from(self.body);
+
+        self.builder.body(body).unwrap()
+    }
 }

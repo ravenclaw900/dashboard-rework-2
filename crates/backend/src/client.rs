@@ -5,8 +5,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use proto::{
-    DashboardSocket, Frame,
-    types::{Handshake, Request},
+    DashboardSocket,
+    types::{DataRequest, DataRequestType, DataResponse, DataResponseType, Handshake},
 };
 use sysinfo::System;
 use tokio::{net::TcpStream, sync::mpsc};
@@ -14,10 +14,17 @@ use tokio::{net::TcpStream, sync::mpsc};
 use crate::getters;
 
 macro_rules! call_getter {
-    ($id:expr, blocking $getter:expr) => {{
-        // Should only return an error here if the getter panics, which we're assuming never happens
-        let getter_res = tokio::task::spawn_blocking(move || $getter).await.unwrap();
-        Frame::from_encode($id, &getter_res)
+    (
+        blocking,
+        getter = $getter:path as $typ:path,
+        $( sys = $sys:expr, )?
+        id = $id:expr
+    ) => {{
+        let data = tokio::task::spawn_blocking(move || $getter($( &mut $sys.lock().unwrap() )?))
+            .await
+            .unwrap();
+        let data = $typ(data);
+        DataResponse { id: $id, data }
     }};
 }
 
@@ -25,18 +32,19 @@ pub type SharedSystem = Arc<Mutex<System>>;
 
 pub struct BackendClient {
     socket: DashboardSocket,
+    nickname: String,
     system: SharedSystem,
-    // config: &'static BackendConfig,
 }
 
 impl BackendClient {
-    pub async fn new(addr: SocketAddr, system: SharedSystem) -> Result<Self> {
+    pub async fn new(addr: SocketAddr, nickname: String, system: SharedSystem) -> Result<Self> {
         let stream = TcpStream::connect(addr)
             .await
             .context("failed to connect to frontend")?;
 
         Ok(Self {
             socket: DashboardSocket::new(stream),
+            nickname,
             system,
         })
     }
@@ -49,13 +57,11 @@ impl BackendClient {
         loop {
             tokio::select! {
                 frame_result = self.socket.read_frame() => {
-                    let frame = frame_result
+                    let req: DataRequest = frame_result
                         .context("failed to read frame from frontend")?
                         .context("frontend unexpectedly disconnected")?;
 
-                    let (id, req) = frame.into_decode::<Request>().context("failed to decode request")?;
-
-                    let handler = RequestHandler::new(id, tx.clone(), req, self.system.clone());
+                    let handler = RequestHandler::new(tx.clone(), req, self.system.clone());
                     tokio::spawn(handler.run());
                 }
                 chan_result = rx.recv() => {
@@ -70,43 +76,52 @@ impl BackendClient {
 
     async fn send_handshake(&mut self) -> Result<()> {
         let handshake = Handshake {
-            nickname: "test".to_string(),
+            nickname: self.nickname.clone(),
         };
 
         self.socket
-            .write_frame(Frame::from_encode(0, &handshake))
+            .write_frame(handshake)
             .await
             .context("failed to send handshake")
     }
 }
 
 struct RequestHandler {
-    id: u16,
-    tx: mpsc::UnboundedSender<Frame>,
-    req: Request,
+    tx: mpsc::UnboundedSender<DataResponse>,
+    req: DataRequest,
     system: SharedSystem,
 }
 
 impl RequestHandler {
-    fn new(id: u16, tx: mpsc::UnboundedSender<Frame>, req: Request, system: SharedSystem) -> Self {
-        Self {
-            id,
-            tx,
-            req,
-            system,
-        }
+    fn new(
+        tx: mpsc::UnboundedSender<DataResponse>,
+        req: DataRequest,
+        system: SharedSystem,
+    ) -> Self {
+        Self { tx, req, system }
     }
 
     async fn run(self) {
-        let frame = match self.req {
-            Request::System => {
-                call_getter!(
-                    self.id,
-                    blocking getters::system(&mut self.system.lock().unwrap())
-                )
-            }
+        let resp = match self.req.data {
+            DataRequestType::Cpu => call_getter!(
+                blocking,
+                getter = getters::cpu as DataResponseType::Cpu,
+                sys = self.system.clone(),
+                id = self.req.id
+            ),
+            DataRequestType::Temp => call_getter!(
+                blocking,
+                getter = getters::temp as DataResponseType::Temp,
+                id = self.req.id
+            ),
+            DataRequestType::Mem => call_getter!(
+                blocking,
+                getter = getters::memory as DataResponseType::Mem,
+                sys = self.system.clone(),
+                id = self.req.id
+            ),
         };
 
-        let _ = self.tx.send(frame);
+        let _ = self.tx.send(resp);
     }
 }

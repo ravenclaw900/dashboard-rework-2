@@ -8,7 +8,8 @@ pub mod backend;
 #[cfg(feature = "frontend")]
 pub mod frontend;
 
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const PROTOCOL_VERSION: u32 = 1;
 
 macro_rules! generate_config_file {
     ($template:literal, $($key:ident = $val:expr),*) => {{

@@ -11,7 +11,8 @@ js_assets=(
 
 css_assets=(
   "$asset_path/css/vars-clean.css"
-  "$asset_path/css/main.css"
+  "$asset_path/css/global.css"
+  "$asset_path/css/system.css"
 )
 
 ./scripts/clean-css.bash "${css_assets[@]:1}" > "${css_assets[0]}"

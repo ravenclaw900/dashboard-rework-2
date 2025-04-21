@@ -19,13 +19,20 @@ fn calc_percent(used: u64, total: u64) -> f32 {
     (percent * 100.).round() / 100.
 }
 
+fn calc_grid_span(num_elts: usize) -> usize {
+    // Starting at two rows, we need roughly 1 row for every 2 elements
+    (num_elts + 1) / 2 + 1
+}
+
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
     let content = html! {
-        section fx-action="/system/cpu-meters" fx-trigger="fx:inited" { "Loading..." }
-        section fx-action="/system/cpu-graph" fx-trigger="fx:inited" { "Loading..." }
-        section fx-action="/system/temp-graph" fx-trigger="fx:inited" { "Loading..." }
-        section fx-action="/system/mem-meters" fx-trigger="fx:inited" { "Loading..." }
-        section fx-action="/system/mem-graph" fx-trigger="fx:inited" { "Loading..." }
+        .card-grid {
+            section fx-action="/system/cpu-meters" fx-trigger="fx:inited" { "Loading..." }
+            section fx-action="/system/cpu-graph" fx-trigger="fx:inited" { "Loading..." }
+            section fx-action="/system/temp-graph" fx-trigger="fx:inited" { "Loading..." }
+            section fx-action="/system/mem-meters" fx-trigger="fx:inited" { "Loading..." }
+            section fx-action="/system/mem-graph" fx-trigger="fx:inited" { "Loading..." }
+        }
     };
 
     template(&req, content)
@@ -37,7 +44,8 @@ pub async fn cpu_meters(req: ServerRequest) -> Result<ServerResponse, ServerResp
 
     let cpu_iter = cpu_data.cpus.iter().zip(1_u8..);
 
-    let span = (cpu_data.cpus.len() + 1) / 2 + 2;
+    // Add 1 row to account for CPU temperature and global CPU
+    let span = calc_grid_span(cpu_data.cpus.len()) + 1;
 
     let content = html! {
         section .{"span-" (span)} fx-action="/system/cpu-meters" fx-trigger="poll" {

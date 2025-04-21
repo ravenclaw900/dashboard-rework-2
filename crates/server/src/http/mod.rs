@@ -1,7 +1,4 @@
-use std::{
-    net::{Ipv6Addr, SocketAddr},
-    path::PathBuf,
-};
+use std::net::{Ipv6Addr, SocketAddr};
 
 use anyhow::{Context, Result};
 use flexible_hyper_server_tls::{HttpOrHttpsAcceptor, rustls_helpers};
@@ -11,58 +8,53 @@ use request::ServerRequest;
 use router::router;
 use tokio::net::TcpListener;
 
-use crate::backend::SharedBackendRegistry;
+use crate::{SharedConfig, backend::SharedBackendRegistry};
 
 pub mod request;
 pub mod response;
 mod router;
 mod statics;
 
-pub struct TlsConfig {
-    pub cert_path: PathBuf,
-    pub key_path: PathBuf,
-}
-
 pub struct HttpServer {
     acceptor: HttpOrHttpsAcceptor,
     backends: SharedBackendRegistry,
+    config: SharedConfig,
 }
 
 impl HttpServer {
-    pub async fn new(
-        port: u16,
-        tls_config: Option<TlsConfig>,
-        backends: SharedBackendRegistry,
-    ) -> Result<Self> {
-        info!("Starting web server on port {port}");
+    pub async fn new(config: SharedConfig, backends: SharedBackendRegistry) -> Result<Self> {
+        info!("Starting web server on port {}", config.http_port);
 
-        let addr = SocketAddr::from((Ipv6Addr::UNSPECIFIED, port));
+        let addr = SocketAddr::from((Ipv6Addr::UNSPECIFIED, config.http_port));
         let listener = TcpListener::bind(addr)
             .await
             .context("failed to bind http server")?;
 
         let mut acceptor = HttpOrHttpsAcceptor::new(listener);
 
-        if let Some(tls_config) = tls_config {
-            let tls = rustls_helpers::get_tlsacceptor_from_files(
-                tls_config.cert_path,
-                tls_config.key_path,
-            )
-            .await
-            .context("failed to build TlsAcceptor")?;
+        if config.enable_tls {
+            let tls =
+                rustls_helpers::get_tlsacceptor_from_files(&config.cert_path, &config.key_path)
+                    .await
+                    .context("failed to build TlsAcceptor")?;
 
             acceptor = acceptor.with_tls(tls)
         }
 
-        Ok(Self { acceptor, backends })
+        Ok(Self {
+            acceptor,
+            backends,
+            config,
+        })
     }
 
     pub async fn run(self) {
         loop {
             let backends = self.backends.clone();
+            let config = self.config.clone();
 
             let service = service_fn(move |req| {
-                let req = ServerRequest::new(req, backends.clone());
+                let req = ServerRequest::new(req, backends.clone(), config.clone());
                 async move { router(req).await }
             });
 

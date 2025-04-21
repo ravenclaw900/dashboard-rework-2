@@ -1,6 +1,7 @@
 use std::{collections::HashMap, net::IpAddr};
 
 use anyhow::{Context, Result};
+use config::PROTOCOL_VERSION;
 use log::{error, info, warn};
 use proto::{
     DashboardSocket, FrameData,
@@ -55,7 +56,16 @@ impl BackendConnection {
             }
         };
 
-        let nickname = self.determine_nickname(handshake);
+        if handshake.version != PROTOCOL_VERSION {
+            warn!("Backend with incompatable version connected");
+            return;
+        }
+
+        let nickname = if !handshake.nickname.is_empty() {
+            handshake.nickname
+        } else {
+            self.addr.to_string()
+        };
 
         let conn_info = BackendInfo {
             nickname,
@@ -85,14 +95,6 @@ impl BackendConnection {
             .and_then(|opt| opt.context("peer disconnected before sending handshake"))?;
 
         Ok(handshake)
-    }
-
-    fn determine_nickname(&self, handshake: Handshake) -> String {
-        if !handshake.nickname.is_empty() {
-            handshake.nickname
-        } else {
-            self.addr.to_string()
-        }
     }
 
     async fn handle_requests(

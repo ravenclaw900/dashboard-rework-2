@@ -4,10 +4,14 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use config::frontend::FrontendConfig;
 use hyper::{StatusCode, body::Incoming, header};
 use proto::types::{DataRequestType, DataResponseType};
 
-use crate::backend::{BackendHandle, SharedBackendRegistry};
+use crate::{
+    SharedConfig,
+    backend::{BackendHandle, SharedBackendRegistry},
+};
 
 use super::response::ServerResponse;
 
@@ -36,16 +40,18 @@ pub struct ServerRequest {
     req: HyperRequest,
     cookies: HashMap<String, String>,
     backends: SharedBackendRegistry,
+    config: SharedConfig,
 }
 
 impl ServerRequest {
-    pub fn new(req: HyperRequest, backends: SharedBackendRegistry) -> Self {
+    pub fn new(req: HyperRequest, backends: SharedBackendRegistry, config: SharedConfig) -> Self {
         let cookies = get_cookies(&req);
 
         Self {
             req,
             cookies,
             backends,
+            config,
         }
     }
 
@@ -108,6 +114,10 @@ impl ServerRequest {
 
     pub fn is_fixi(&self) -> bool {
         self.headers().contains_key("fx-request")
+    }
+
+    pub fn config(&self) -> &FrontendConfig {
+        &self.config
     }
 }
 

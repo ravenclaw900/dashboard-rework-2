@@ -82,7 +82,7 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                     }
 
                     footer {
-                        "DietPi Dashboard v" (config::VERSION) " by ravenclaw900"
+                        "DietPi Dashboard v" (config::APP_VERSION) " by ravenclaw900"
                         a href="https://github.com/ravenclaw900/DietPi-Dashboard" target="_blank" {
                             (Icon::new("cib-github").size(32))
                         }

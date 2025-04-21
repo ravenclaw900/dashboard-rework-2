@@ -1,9 +1,7 @@
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
+use config::PROTOCOL_VERSION;
 use proto::{
     DashboardSocket,
     types::{DataRequest, DataRequestType, DataResponse, DataResponseType, Handshake},
@@ -11,7 +9,7 @@ use proto::{
 use sysinfo::System;
 use tokio::{net::TcpStream, sync::mpsc};
 
-use crate::getters;
+use crate::{SharedConfig, getters};
 
 macro_rules! call_getter {
     (
@@ -32,19 +30,19 @@ pub type SharedSystem = Arc<Mutex<System>>;
 
 pub struct BackendClient {
     socket: DashboardSocket,
-    nickname: String,
+    config: SharedConfig,
     system: SharedSystem,
 }
 
 impl BackendClient {
-    pub async fn new(addr: SocketAddr, nickname: String, system: SharedSystem) -> Result<Self> {
-        let stream = TcpStream::connect(addr)
+    pub async fn new(config: SharedConfig, system: SharedSystem) -> Result<Self> {
+        let stream = TcpStream::connect(config.frontend_addr)
             .await
             .context("failed to connect to frontend")?;
 
         Ok(Self {
             socket: DashboardSocket::new(stream),
-            nickname,
+            config,
             system,
         })
     }
@@ -76,7 +74,8 @@ impl BackendClient {
 
     async fn send_handshake(&mut self) -> Result<()> {
         let handshake = Handshake {
-            nickname: self.nickname.clone(),
+            nickname: self.config.nickname.clone(),
+            version: PROTOCOL_VERSION,
         };
 
         self.socket

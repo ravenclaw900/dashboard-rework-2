@@ -5,6 +5,7 @@ use crate::FrameData;
 #[derive(Debug, Encode, Decode)]
 pub struct Handshake {
     pub nickname: String,
+    pub version: u32,
 }
 
 pub struct DataRequest {

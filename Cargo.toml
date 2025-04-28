@@ -17,7 +17,7 @@ bitcode = "0.6.3"
 log = { version = "0.4.22", features = ["serde"] }
 serde = { version = "1.0.210", features = ["derive"] }
 simple_logger = "5.0.0"
-tokio = "1.40.0"
+tokio = "1.44.2"
 
 [profile.release]
 panic = "abort"

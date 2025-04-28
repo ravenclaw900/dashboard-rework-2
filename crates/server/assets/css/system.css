@@ -75,3 +75,8 @@
         stroke: none;
     }
 }
+
+.dummy {
+    --purple: var(--purple-6);
+    --pink: var(--pink-6);
+}

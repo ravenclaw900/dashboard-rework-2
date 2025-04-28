@@ -77,10 +77,6 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                             (Icon::new("fa6-solid-database"))
                             "System"
                         }
-                        a href="/settings" {
-                            (Icon::new("fa6-solid-gear"))
-                            "Settings"
-                        }
                     }
 
                     main {

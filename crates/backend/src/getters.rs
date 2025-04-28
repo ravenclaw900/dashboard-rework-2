@@ -1,8 +1,10 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use sysinfo::{Components, Disks, System};
 
-use proto::types::{CpuResponse, DiskInfo, DiskResponse, MemResponse, TempResponse, UsageData};
+use proto::types::{
+    CpuResponse, DiskInfo, DiskResponse, MemResponse, NetworkResponse, TempResponse, UsageData,
+};
 
 use crate::client::BackendContext;
 
@@ -11,7 +13,7 @@ fn round_to_2(num: f32) -> f32 {
 }
 
 pub fn cpu(mut ctx: BackendContext) -> CpuResponse {
-    let mut sys = ctx.system();
+    let sys = &mut ctx.system().system;
 
     sys.refresh_cpu_usage();
 
@@ -25,8 +27,9 @@ pub fn cpu(mut ctx: BackendContext) -> CpuResponse {
     CpuResponse { global_cpu, cpus }
 }
 
-pub fn temp(_ctx: BackendContext) -> TempResponse {
-    let components = Components::new_with_refreshed_list();
+pub fn temp(mut ctx: BackendContext) -> TempResponse {
+    let components = &mut ctx.system().components;
+    components.refresh();
     let components = components.list();
 
     let known_sensor_names = ["coretemp Package"];
@@ -41,7 +44,7 @@ pub fn temp(_ctx: BackendContext) -> TempResponse {
 }
 
 pub fn memory(mut ctx: BackendContext) -> MemResponse {
-    let mut sys = ctx.system();
+    let sys = &mut ctx.system().system;
 
     // Refreshes both RAM and Swap
     sys.refresh_memory();
@@ -59,16 +62,17 @@ pub fn memory(mut ctx: BackendContext) -> MemResponse {
     MemResponse { ram, swap }
 }
 
-pub fn disks(ctx: BackendContext) -> DiskResponse {
+pub fn disks(mut ctx: BackendContext) -> DiskResponse {
     let mnt_points = &ctx.config().disks;
-    let mnt_points: Vec<_> = mnt_points.iter().map(Path::new).collect();
+    let mnt_points: Vec<_> = mnt_points.iter().map(PathBuf::from).collect();
 
-    let disks = Disks::new_with_refreshed_list();
+    let disks = &mut ctx.system().disks;
+    disks.refresh();
     let disks = disks.list();
 
     let disks: Vec<_> = disks
         .iter()
-        .filter(|disk| mnt_points.contains(&disk.mount_point()))
+        .filter(|disk| mnt_points.iter().any(|path| path == disk.mount_point()))
         .map(|disk| DiskInfo {
             name: disk.name().to_str().unwrap_or("unknown").into(),
             mnt_point: disk.mount_point().to_str().unwrap_or("unknown").into(),
@@ -80,4 +84,19 @@ pub fn disks(ctx: BackendContext) -> DiskResponse {
         .collect();
 
     DiskResponse { disks }
+}
+
+pub fn network_io(mut ctx: BackendContext) -> NetworkResponse {
+    let networks = &mut ctx.system().networks;
+    networks.refresh();
+    let networks = networks.list();
+
+    let mut resp = NetworkResponse { sent: 0, recv: 0 };
+
+    for net in networks.values() {
+        resp.recv += net.received();
+        resp.sent += net.transmitted();
+    }
+
+    resp
 }

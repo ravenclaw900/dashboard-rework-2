@@ -19,6 +19,7 @@ pub enum DataRequestType {
     Temp,
     Mem,
     Disk,
+    NetIO,
 }
 
 pub struct DataResponse {
@@ -32,6 +33,7 @@ pub enum DataResponseType {
     Temp(TempResponse),
     Mem(MemResponse),
     Disk(DiskResponse),
+    NetIO(NetworkResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -67,6 +69,12 @@ pub struct DiskInfo {
     pub name: String,
     pub mnt_point: String,
     pub usage: UsageData,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct NetworkResponse {
+    pub sent: u64,
+    pub recv: u64,
 }
 
 impl FrameData for DataRequest {

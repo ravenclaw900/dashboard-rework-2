@@ -21,6 +21,10 @@ pub struct SystemQuery {
     ram_points: QueryArray,
     #[serde(default)]
     swap_points: QueryArray,
+    #[serde(default)]
+    sent_points: QueryArray,
+    #[serde(default)]
+    recv_points: QueryArray,
 }
 
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
@@ -30,6 +34,7 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
     let temp_data = fetch_data!(req, Temp)?;
     let mem_data = fetch_data!(req, Mem)?;
     let disk_data = fetch_data!(req, Disk)?;
+    let net_data = fetch_data!(req, NetIO)?;
 
     let cpu_meters = fragments::cpu_meters(&cpu_data, &temp_data);
     let mem_meters = fragments::mem_meters(&mem_data);
@@ -43,6 +48,11 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
         query.ram_points.to_iter(),
         query.swap_points.to_iter(),
     );
+    let (net_graph, sent_points, recv_points) = fragments::net_graph(
+        &net_data,
+        query.sent_points.to_iter(),
+        query.recv_points.to_iter(),
+    );
 
     let temp_points = temp_points.into_iter().flatten();
 
@@ -51,6 +61,8 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
         temp_points: QueryArray::from_iter(temp_points),
         ram_points: QueryArray::from_iter(ram_points),
         swap_points: QueryArray::from_iter(swap_points),
+        sent_points: QueryArray::from_iter(sent_points),
+        recv_points: QueryArray::from_iter(recv_points),
     };
 
     let new_query = serde_urlencoded::to_string(new_query).unwrap();
@@ -65,6 +77,7 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
             (mem_meters)
             (mem_graph)
             (disk_meters)
+            (net_graph)
         }
     };
 

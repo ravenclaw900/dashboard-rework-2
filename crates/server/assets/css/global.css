@@ -73,6 +73,8 @@ nav {
 
     background-color: var(--gray-12);
 
+    overflow-x: hidden;
+
     a {
         grid-column: span 2;
 

@@ -6,7 +6,7 @@ use proto::{
     DashboardSocket,
     types::{DataRequest, DataRequestType, DataResponse, DataResponseType, Handshake},
 };
-use sysinfo::System;
+use sysinfo::{Components, Disks, Networks, System};
 use tokio::{net::TcpStream, sync::mpsc};
 
 use crate::{SharedConfig, getters};
@@ -26,7 +26,25 @@ macro_rules! call_getter {
     }};
 }
 
-pub type SharedSystem = Arc<Mutex<System>>;
+pub type SharedSystem = Arc<Mutex<SystemComponents>>;
+
+pub struct SystemComponents {
+    pub system: System,
+    pub components: Components,
+    pub disks: Disks,
+    pub networks: Networks,
+}
+
+impl SystemComponents {
+    pub fn new() -> Self {
+        Self {
+            system: System::new(),
+            components: Components::new_with_refreshed_list(),
+            disks: Disks::new_with_refreshed_list(),
+            networks: Networks::new_with_refreshed_list(),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct BackendContext {
@@ -35,7 +53,7 @@ pub struct BackendContext {
 }
 
 impl BackendContext {
-    pub fn system(&mut self) -> impl std::ops::DerefMut<Target = System> {
+    pub fn system(&mut self) -> impl std::ops::DerefMut<Target = SystemComponents> {
         self.system.lock().unwrap()
     }
 
@@ -140,6 +158,14 @@ impl RequestHandler {
                 call_getter!(
                     blocking,
                     getter = getters::disks as DataResponseType::Disk,
+                    ctx = self.context,
+                    id = self.req.id
+                )
+            }
+            DataRequestType::NetIO => {
+                call_getter!(
+                    blocking,
+                    getter = getters::network_io as DataResponseType::NetIO,
                     ctx = self.context,
                     id = self.req.id
                 )

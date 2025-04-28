@@ -138,7 +138,7 @@ impl DerefMut for ServerRequest {
 
 // Wrapper type that makes de/serialize multiple fields in a query param easier
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct QueryArray(pub String);
+pub struct QueryArray(String);
 
 impl QueryArray {
     pub fn to_iter<T>(&self) -> impl Iterator<Item = T> + Clone

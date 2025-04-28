@@ -71,7 +71,7 @@ impl SvgGraph {
 
 impl Render for SvgGraph {
     fn render(&self) -> maud::Markup {
-        let left_margin = LINE_SPACING * 4 / 3;
+        let left_margin = LINE_SPACING * 5 / 3;
         let right_margin = LINE_SPACING / 2;
         let top_margin = LINE_SPACING / 2;
         let bottom_margin = LINE_SPACING / 2;

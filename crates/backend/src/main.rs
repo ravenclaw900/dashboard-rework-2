@@ -1,17 +1,13 @@
-use std::{
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use client::BackendClient;
+use client::{BackendClient, SystemComponents};
 use config::{
     APP_VERSION,
     backend::{BackendConfig, get_config},
 };
 use log::{error, info};
 use simple_logger::SimpleLogger;
-use sysinfo::System;
 
 mod client;
 mod getters;
@@ -31,7 +27,7 @@ async fn main() -> Result<()> {
 
     info!("Connecting to {}", config.frontend_addr);
 
-    let system = Arc::new(Mutex::new(System::new()));
+    let system = Arc::new(Mutex::new(SystemComponents::new()));
 
     let client = BackendClient::new(config.clone(), system.clone()).await?;
 

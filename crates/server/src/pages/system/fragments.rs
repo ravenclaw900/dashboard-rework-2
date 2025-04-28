@@ -1,6 +1,6 @@
 use maud::{Markup, html};
 use pretty_bytes_typed::{pretty_bytes, pretty_bytes_binary};
-use proto::types::{CpuResponse, DiskResponse, MemResponse, TempResponse};
+use proto::types::{CpuResponse, DiskResponse, MemResponse, NetworkResponse, TempResponse};
 
 use super::graph::{Axis, SvgGraph};
 
@@ -158,4 +158,31 @@ pub fn disk_meters(data: &DiskResponse) -> Markup {
             }
         }
     }
+}
+
+pub fn net_graph(
+    data: &NetworkResponse,
+    sent_points: impl Iterator<Item = f32> + Clone,
+    recv_points: impl Iterator<Item = f32> + Clone,
+) -> (Markup, impl Iterator<Item = f32>, impl Iterator<Item = f32>) {
+    let mut graph = SvgGraph::new(Axis::Bytes);
+
+    let sent_points = std::iter::once(data.sent as f32)
+        .chain(sent_points)
+        .take(20);
+    let recv_points = std::iter::once(data.recv as f32)
+        .chain(recv_points)
+        .take(20);
+
+    graph.add_series(sent_points.clone(), "var(--purple-6)");
+    graph.add_series(recv_points.clone(), "var(--pink-6)");
+
+    let content = html! {
+        section .span-3 {
+            h2 { "Network Graph" }
+            (graph)
+        }
+    };
+
+    (content, sent_points, recv_points)
 }

@@ -1,12 +1,18 @@
-use sysinfo::{Components, System};
+use std::path::Path;
 
-use proto::types::{CpuResponse, MemResponse, TempResponse, UsageData};
+use sysinfo::{Components, Disks, System};
+
+use proto::types::{CpuResponse, DiskInfo, DiskResponse, MemResponse, TempResponse, UsageData};
+
+use crate::client::BackendContext;
 
 fn round_to_2(num: f32) -> f32 {
     (num * 100.).round() / 100.
 }
 
-pub fn cpu(sys: &mut System) -> CpuResponse {
+pub fn cpu(mut ctx: BackendContext) -> CpuResponse {
+    let mut sys = ctx.system();
+
     sys.refresh_cpu_usage();
 
     let global_cpu = round_to_2(sys.global_cpu_usage());
@@ -19,7 +25,7 @@ pub fn cpu(sys: &mut System) -> CpuResponse {
     CpuResponse { global_cpu, cpus }
 }
 
-pub fn temp() -> TempResponse {
+pub fn temp(_ctx: BackendContext) -> TempResponse {
     let components = Components::new_with_refreshed_list();
     let components = components.list();
 
@@ -34,7 +40,9 @@ pub fn temp() -> TempResponse {
     TempResponse { temp }
 }
 
-pub fn memory(sys: &mut System) -> MemResponse {
+pub fn memory(mut ctx: BackendContext) -> MemResponse {
+    let mut sys = ctx.system();
+
     // Refreshes both RAM and Swap
     sys.refresh_memory();
 
@@ -49,4 +57,27 @@ pub fn memory(sys: &mut System) -> MemResponse {
     };
 
     MemResponse { ram, swap }
+}
+
+pub fn disks(ctx: BackendContext) -> DiskResponse {
+    let mnt_points = &ctx.config().disks;
+    let mnt_points: Vec<_> = mnt_points.iter().map(Path::new).collect();
+
+    let disks = Disks::new_with_refreshed_list();
+    let disks = disks.list();
+
+    let disks: Vec<_> = disks
+        .iter()
+        .filter(|disk| mnt_points.contains(&disk.mount_point()))
+        .map(|disk| DiskInfo {
+            name: disk.name().to_str().unwrap_or("unknown").into(),
+            mnt_point: disk.mount_point().to_str().unwrap_or("unknown").into(),
+            usage: UsageData {
+                used: disk.total_space() - disk.available_space(),
+                total: disk.total_space(),
+            },
+        })
+        .collect();
+
+    DiskResponse { disks }
 }

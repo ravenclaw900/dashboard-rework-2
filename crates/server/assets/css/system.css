@@ -55,6 +55,11 @@
         --start: light-dark(var(--blue-6), var(--blue-8));
         --end: var(--blue-10);
     }
+
+    >.bar.-disk {
+        --start: var(--yellow-6);
+        --end: var(--yellow-10);
+    }
 }
 
 .graph {

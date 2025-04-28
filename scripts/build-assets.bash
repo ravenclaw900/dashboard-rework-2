@@ -4,8 +4,7 @@ asset_path='crates/server/assets'
 dist_path='crates/server/dist'
 
 js_assets=(
-  "$asset_path/js/fixi-0.6.5.js"
-  "$asset_path/js/ext-fixi.js"
+  "$asset_path/js/microlight-0.0.7.js"
   "$asset_path/js/components.js"
 )
 

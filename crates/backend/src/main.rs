@@ -16,11 +16,11 @@ use sysinfo::System;
 mod client;
 mod getters;
 
-pub type SharedConfig = Rc<BackendConfig>;
+pub type SharedConfig = Arc<BackendConfig>;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    let config = Rc::new(get_config().context("failed to get config")?);
+    let config = Arc::new(get_config().context("failed to get config")?);
 
     SimpleLogger::new()
         .with_level(config.log_level)

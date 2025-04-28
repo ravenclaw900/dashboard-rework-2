@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     net::IpAddr,
     ops::{Deref, DerefMut},
+    str::FromStr,
 };
 
 use config::frontend::FrontendConfig;
@@ -102,10 +103,10 @@ impl ServerRequest {
         })
     }
 
-    pub fn extract_query<Qu: serde::de::DeserializeOwned>(&self) -> Result<Qu, ServerResponse> {
+    pub fn extract_query<'a, Qu: serde::Deserialize<'a>>(&'a self) -> Result<Qu, ServerResponse> {
         let query = self.uri().query().unwrap_or_default();
 
-        serde_urlencoded::from_str::<Qu>(query).map_err(|_| {
+        serde_urlencoded::from_str(query).map_err(|_| {
             ServerResponse::new()
                 .status(StatusCode::BAD_REQUEST)
                 .body("invalid query params")
@@ -137,28 +138,29 @@ impl DerefMut for ServerRequest {
 
 // Wrapper type that makes de/serialize multiple fields in a query param easier
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct QueryArray(String);
+pub struct QueryArray(pub String);
 
 impl QueryArray {
-    pub fn from_iter<T, I>(iter: I) -> Self
-    where
-        T: std::fmt::Display,
-        I: IntoIterator<Item = T>,
-    {
-        use core::fmt::Write;
-
-        let inner = iter.into_iter().fold(String::new(), |mut acc, x| {
-            let _ = write!(&mut acc, "{x},");
-            acc
-        });
-
-        Self(inner)
-    }
-
     pub fn to_iter<T>(&self) -> impl Iterator<Item = T> + Clone
     where
         T: std::str::FromStr,
     {
         self.0.split(',').filter_map(|x| x.parse().ok())
+    }
+
+    pub fn from_iter<T, I>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = I>,
+        I: std::fmt::Display,
+    {
+        use core::fmt::Write;
+
+        let mut inner = String::new();
+
+        for item in iter {
+            write!(inner, "{item},");
+        }
+
+        Self(inner)
     }
 }

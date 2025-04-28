@@ -33,4 +33,4 @@ macro_rules! cache {
     };
 }
 
-cache!(BackendCache, [cpu: Cpu, temp: Temp, mem: Mem]);
+cache!(BackendCache, [cpu: Cpu, temp: Temp, mem: Mem, disk: Disk]);

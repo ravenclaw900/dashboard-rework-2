@@ -18,6 +18,7 @@ pub enum DataRequestType {
     Cpu,
     Temp,
     Mem,
+    Disk,
 }
 
 pub struct DataResponse {
@@ -30,6 +31,7 @@ pub enum DataResponseType {
     Cpu(CpuResponse),
     Temp(TempResponse),
     Mem(MemResponse),
+    Disk(DiskResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -53,6 +55,18 @@ pub struct MemResponse {
 pub struct UsageData {
     pub used: u64,
     pub total: u64,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct DiskResponse {
+    pub disks: Vec<DiskInfo>,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct DiskInfo {
+    pub name: String,
+    pub mnt_point: String,
+    pub usage: UsageData,
 }
 
 impl FrameData for DataRequest {

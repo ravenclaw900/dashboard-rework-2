@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use config::PROTOCOL_VERSION;
+use config::{PROTOCOL_VERSION, backend::BackendConfig};
 use proto::{
     DashboardSocket,
     types::{DataRequest, DataRequestType, DataResponse, DataResponseType, Handshake},
@@ -15,10 +15,10 @@ macro_rules! call_getter {
     (
         blocking,
         getter = $getter:path as $typ:path,
-        $( sys = $sys:expr, )?
+        ctx = $ctx:expr,
         id = $id:expr
     ) => {{
-        let data = tokio::task::spawn_blocking(move || $getter($( &mut $sys.lock().unwrap() )?))
+        let data = tokio::task::spawn_blocking(move || $getter($ctx))
             .await
             .unwrap();
         let data = $typ(data);
@@ -28,10 +28,25 @@ macro_rules! call_getter {
 
 pub type SharedSystem = Arc<Mutex<System>>;
 
-pub struct BackendClient {
-    socket: DashboardSocket,
+#[derive(Clone)]
+pub struct BackendContext {
     config: SharedConfig,
     system: SharedSystem,
+}
+
+impl BackendContext {
+    pub fn system(&mut self) -> impl std::ops::DerefMut<Target = System> {
+        self.system.lock().unwrap()
+    }
+
+    pub fn config(&self) -> &BackendConfig {
+        &self.config
+    }
+}
+
+pub struct BackendClient {
+    socket: DashboardSocket,
+    context: BackendContext,
 }
 
 impl BackendClient {
@@ -42,8 +57,7 @@ impl BackendClient {
 
         Ok(Self {
             socket: DashboardSocket::new(stream),
-            config,
-            system,
+            context: BackendContext { config, system },
         })
     }
 
@@ -59,7 +73,7 @@ impl BackendClient {
                         .context("failed to read frame from frontend")?
                         .context("frontend unexpectedly disconnected")?;
 
-                    let handler = RequestHandler::new(tx.clone(), req, self.system.clone());
+                    let handler = RequestHandler::new(tx.clone(), req, self.context.clone());
                     tokio::spawn(handler.run());
                 }
                 chan_result = rx.recv() => {
@@ -73,8 +87,10 @@ impl BackendClient {
     }
 
     async fn send_handshake(&mut self) -> Result<()> {
+        let nickname = self.context.config.nickname.clone();
+
         let handshake = Handshake {
-            nickname: self.config.nickname.clone(),
+            nickname,
             version: PROTOCOL_VERSION,
         };
 
@@ -88,16 +104,16 @@ impl BackendClient {
 struct RequestHandler {
     tx: mpsc::UnboundedSender<DataResponse>,
     req: DataRequest,
-    system: SharedSystem,
+    context: BackendContext,
 }
 
 impl RequestHandler {
     fn new(
         tx: mpsc::UnboundedSender<DataResponse>,
         req: DataRequest,
-        system: SharedSystem,
+        context: BackendContext,
     ) -> Self {
-        Self { tx, req, system }
+        Self { tx, req, context }
     }
 
     async fn run(self) {
@@ -105,20 +121,29 @@ impl RequestHandler {
             DataRequestType::Cpu => call_getter!(
                 blocking,
                 getter = getters::cpu as DataResponseType::Cpu,
-                sys = self.system.clone(),
+                ctx = self.context,
                 id = self.req.id
             ),
             DataRequestType::Temp => call_getter!(
                 blocking,
                 getter = getters::temp as DataResponseType::Temp,
+                ctx = self.context,
                 id = self.req.id
             ),
             DataRequestType::Mem => call_getter!(
                 blocking,
                 getter = getters::memory as DataResponseType::Mem,
-                sys = self.system.clone(),
+                ctx = self.context,
                 id = self.req.id
             ),
+            DataRequestType::Disk => {
+                call_getter!(
+                    blocking,
+                    getter = getters::disks as DataResponseType::Disk,
+                    ctx = self.context,
+                    id = self.req.id
+                )
+            }
         };
 
         let _ = self.tx.send(resp);

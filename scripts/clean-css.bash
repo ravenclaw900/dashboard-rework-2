@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 used_vars=$(grep -Eho -- '--[a-z0-9-]+' "$@" | sort -u)
 

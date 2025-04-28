@@ -22,4 +22,5 @@ proto.workspace = true
 serde.workspace = true
 serde_urlencoded = "0.7.1"
 simple_logger.workspace = true
+strum = { version = "0.27.1", features = ["derive"] }
 tokio = { workspace = true, features = ["rt", "macros"] }

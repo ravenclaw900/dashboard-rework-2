@@ -7,14 +7,16 @@ use crate::http::{
 };
 
 macro_rules! fetch_data {
-    ($req:expr, $variant:ident) => {
+    ($req:expr, $variant:ident) => {{
+        use proto::types::{DataRequestType, DataResponseType};
+
         $req.send_backend_req_oneshot(DataRequestType::$variant)
             .await
             .map(|resp| match resp {
                 DataResponseType::$variant(resp) => resp,
                 _ => unreachable!(),
             })
-    };
+    }};
 }
 
 pub(crate) use fetch_data;
@@ -74,6 +76,10 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                         a href="/system" {
                             (Icon::new("fa6-solid-database"))
                             "System"
+                        }
+                        a href="/settings" {
+                            (Icon::new("fa6-solid-gear"))
+                            "Settings"
                         }
                     }
 

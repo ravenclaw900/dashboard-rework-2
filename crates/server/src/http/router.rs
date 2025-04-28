@@ -37,11 +37,6 @@ pub async fn router(req: ServerRequest) -> Result<BuiltResponse, std::convert::I
         (GET, []) => async |_| { Ok(ServerResponse::new().redirect(RedirectType::Permanent, "/system")) },
 
         (GET, ["system"]) => pages::system::page,
-        (GET, ["system", "cpu-meters"]) => pages::system::cpu_meters,
-        (GET, ["system", "mem-meters"]) => pages::system::mem_meters,
-        (GET, ["system", "cpu-graph"]) => pages::system::cpu_graph,
-        (GET, ["system", "temp-graph"]) => pages::system::temp_graph,
-        (GET, ["system", "mem-graph"]) => pages::system::mem_graph,
 
         _ => || { ServerResponse::new().status(StatusCode::NOT_FOUND).body("page not found") },
     });

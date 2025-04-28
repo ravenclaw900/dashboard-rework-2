@@ -18,7 +18,8 @@ fn generate_config_file(config: &BackendConfig) -> String {
         "config-backend.template.toml",
         log_level = config.log_level,
         frontend_addr = config.frontend_addr,
-        nickname = config.nickname
+        nickname = config.nickname,
+        disks = config.disks
     )
 }
 
@@ -29,6 +30,7 @@ pub struct BackendConfigV1 {
     pub log_level: LevelFilter,
     pub frontend_addr: SocketAddr,
     pub nickname: String,
+    pub disks: Vec<String>,
 }
 
 impl Default for BackendConfigV1 {
@@ -37,6 +39,7 @@ impl Default for BackendConfigV1 {
             log_level: LevelFilter::Info,
             frontend_addr: ([127, 0, 0, 1], 5353).into(),
             nickname: String::new(),
+            disks: vec!["/".into()],
         }
     }
 }
@@ -49,6 +52,7 @@ impl From<BackendConfigV0> for BackendConfigV1 {
             log_level: val.log_level.unwrap_or(default.log_level),
             frontend_addr: default.frontend_addr,
             nickname: default.nickname,
+            disks: default.disks,
         }
     }
 }

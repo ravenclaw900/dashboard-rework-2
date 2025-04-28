@@ -11,5 +11,5 @@ config = { workspace = true, features = ["backend"] }
 log.workspace = true
 proto.workspace = true
 simple_logger.workspace = true
-sysinfo = { version = "0.32.0", default-features = false, features = ["system", "component"] }
+sysinfo = { version = "0.32.0", default-features = false, features = ["system", "component", "disk"] }
 tokio = { workspace = true, features = ["rt", "net", "sync", "macros"] }

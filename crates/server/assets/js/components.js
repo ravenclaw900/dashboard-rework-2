@@ -1,5 +1,5 @@
 (() => {
-    customElements.define("theme-switcher", class extends HTMLElement {
+    class ThemeSwitcher extends HTMLElement {
         connectedCallback() {
             let button = this.querySelector("button");
             this.meta = this.querySelector("meta[name='color-scheme']");
@@ -17,15 +17,51 @@
 
         toggle() {
             localStorage.setItem("darkMode", this.isDark);
-            if (this.isDark) {
-                this.meta.content = "dark";
-                this.darkIcon.style.display = "";
-                this.lightIcon.style.display = "none";
-            } else {
-                this.meta.content = "light";
-                this.darkIcon.style.display = "none";
-                this.lightIcon.style.display = "";
-            }
+            this.meta.content = this.isDark ? "dark" : "light";
+            this.darkIcon.style.display = this.isDark ? "" : "none";
+            this.lightIcon.style.display = this.isDark ? "none" : "";
         }
-    });
+    }
+
+    customElements.define("theme-switcher", ThemeSwitcher);
+
+    class ServerSwap extends HTMLElement {
+        connectedCallback() {
+            let url = this.getAttribute("action") || window.location.href;
+            const method = (this.getAttribute("method") || "GET").toUpperCase();
+            const trigger = this.getAttribute("trigger") || "click";
+            const targetAttr = this.getAttribute("target");
+            const target = !targetAttr ? this : targetAttr === "none" ? null : document.querySelector(targetAttr);
+
+            const swap = async () => {
+                try {
+                    const resp = await fetch(url, { method, headers: { "fx-request": "true" } });
+                    const text = await resp.text();
+
+                    if (!resp.ok)
+                        throw new Error(`${resp.statusText}: ${text}`);
+
+                    const doSwap = () => {
+                        if (target)
+                            target.outerHTML = text;
+                    };
+
+                    if (document.startViewTransition) {
+                        document.startViewTransition(doSwap);
+                    } else {
+                        doSwap();
+                    };
+                } catch (err) {
+                    document.querySelector("main").innerText = `Error: ${err.message}`;
+                }
+            };
+
+            if (trigger === "delay")
+                setTimeout(swap, 2000);
+            else
+                this.addEventListener(trigger, swap);
+        }
+    }
+
+    customElements.define("server-swap", ServerSwap);
 })();

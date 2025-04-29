@@ -77,6 +77,10 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                             (Icon::new("fa6-solid-database"))
                             "System"
                         }
+                        a href="/terminal" {
+                            (Icon::new("fa6-solid-terminal"))
+                            "Terminal"
+                        }
                     }
 
                     main {

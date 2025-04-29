@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use config::{PROTOCOL_VERSION, backend::BackendConfig};
 use proto::{
     DashboardSocket,
-    types::{DataRequest, DataRequestType, DataResponse, DataResponseType, Handshake},
+    types::{BackendMessage, BackendMessageType, FrontendMessage, FrontendMessageType, Handshake},
 };
 use sysinfo::{Components, Disks, Networks, System};
 use tokio::{net::TcpStream, sync::mpsc};
@@ -22,7 +22,7 @@ macro_rules! call_getter {
             .await
             .unwrap();
         let data = $typ(data);
-        DataResponse { id: $id, data }
+        BackendMessage { id: $id, data }
     }};
 }
 
@@ -87,7 +87,7 @@ impl BackendClient {
         loop {
             tokio::select! {
                 frame_result = self.socket.read_frame() => {
-                    let req: DataRequest = frame_result
+                    let req: FrontendMessage = frame_result
                         .context("failed to read frame from frontend")?
                         .context("frontend unexpectedly disconnected")?;
 
@@ -112,23 +112,28 @@ impl BackendClient {
             version: PROTOCOL_VERSION,
         };
 
+        let message = BackendMessage {
+            id: None,
+            data: BackendMessageType::Handshake(handshake),
+        };
+
         self.socket
-            .write_frame(handshake)
+            .write_frame(message)
             .await
             .context("failed to send handshake")
     }
 }
 
 struct RequestHandler {
-    tx: mpsc::UnboundedSender<DataResponse>,
-    req: DataRequest,
+    tx: mpsc::UnboundedSender<BackendMessage>,
+    req: FrontendMessage,
     context: BackendContext,
 }
 
 impl RequestHandler {
     fn new(
-        tx: mpsc::UnboundedSender<DataResponse>,
-        req: DataRequest,
+        tx: mpsc::UnboundedSender<BackendMessage>,
+        req: FrontendMessage,
         context: BackendContext,
     ) -> Self {
         Self { tx, req, context }
@@ -136,36 +141,36 @@ impl RequestHandler {
 
     async fn run(self) {
         let resp = match self.req.data {
-            DataRequestType::Cpu => call_getter!(
+            FrontendMessageType::Cpu => call_getter!(
                 blocking,
-                getter = getters::cpu as DataResponseType::Cpu,
+                getter = getters::cpu as BackendMessageType::Cpu,
                 ctx = self.context,
                 id = self.req.id
             ),
-            DataRequestType::Temp => call_getter!(
+            FrontendMessageType::Temp => call_getter!(
                 blocking,
-                getter = getters::temp as DataResponseType::Temp,
+                getter = getters::temp as BackendMessageType::Temp,
                 ctx = self.context,
                 id = self.req.id
             ),
-            DataRequestType::Mem => call_getter!(
+            FrontendMessageType::Mem => call_getter!(
                 blocking,
-                getter = getters::memory as DataResponseType::Mem,
+                getter = getters::memory as BackendMessageType::Mem,
                 ctx = self.context,
                 id = self.req.id
             ),
-            DataRequestType::Disk => {
+            FrontendMessageType::Disk => {
                 call_getter!(
                     blocking,
-                    getter = getters::disks as DataResponseType::Disk,
+                    getter = getters::disks as BackendMessageType::Disk,
                     ctx = self.context,
                     id = self.req.id
                 )
             }
-            DataRequestType::NetIO => {
+            FrontendMessageType::NetIO => {
                 call_getter!(
                     blocking,
-                    getter = getters::network_io as DataResponseType::NetIO,
+                    getter = getters::network_io as BackendMessageType::NetIO,
                     ctx = self.context,
                     id = self.req.id
                 )

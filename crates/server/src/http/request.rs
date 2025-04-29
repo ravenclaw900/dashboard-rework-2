@@ -7,7 +7,7 @@ use std::{
 
 use config::frontend::FrontendConfig;
 use hyper::{StatusCode, body::Incoming, header};
-use proto::types::{DataRequestType, DataResponseType};
+use proto::types::{FrontendMessageType, BackendMessageType};
 
 use crate::{
     SharedConfig,
@@ -92,8 +92,8 @@ impl ServerRequest {
 
     pub async fn send_backend_req_oneshot(
         &self,
-        req: DataRequestType,
-    ) -> Result<DataResponseType, ServerResponse> {
+        req: FrontendMessageType,
+    ) -> Result<BackendMessageType, ServerResponse> {
         let backend_handle = self.extract_backends()?.current_backend.1;
 
         backend_handle.send_req_oneshot(req).await.map_err(|err| {

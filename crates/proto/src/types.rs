@@ -1,20 +1,19 @@
 use bitcode::{Decode, Encode};
 
-use crate::FrameData;
-
-#[derive(Debug, Encode, Decode)]
+#[derive(Debug, Clone, Encode, Decode)]
 pub struct Handshake {
     pub nickname: String,
     pub version: u32,
 }
 
-pub struct DataRequest {
-    pub id: u16,
-    pub data: DataRequestType,
+#[derive(Debug, Encode, Decode)]
+pub struct FrontendMessage {
+    pub id: Option<u16>,
+    pub data: FrontendMessageType,
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
-pub enum DataRequestType {
+pub enum FrontendMessageType {
     Cpu,
     Temp,
     Mem,
@@ -22,13 +21,15 @@ pub enum DataRequestType {
     NetIO,
 }
 
-pub struct DataResponse {
-    pub id: u16,
-    pub data: DataResponseType,
+#[derive(Debug, Encode, Decode)]
+pub struct BackendMessage {
+    pub id: Option<u16>,
+    pub data: BackendMessageType,
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
-pub enum DataResponseType {
+pub enum BackendMessageType {
+    Handshake(Handshake),
     Cpu(CpuResponse),
     Temp(TempResponse),
     Mem(MemResponse),
@@ -77,44 +78,5 @@ pub struct NetworkResponse {
     pub recv: u64,
 }
 
-impl FrameData for DataRequest {
-    fn from_data(id: u16, data: &[u8]) -> Result<Self, bitcode::Error> {
-        let data: DataRequestType = bitcode::decode(data)?;
-
-        Ok(Self { id, data })
-    }
-
-    fn to_data(&self) -> (u16, Vec<u8>) {
-        let data = bitcode::encode(&self.data);
-
-        (self.id, data)
-    }
-}
-
-impl FrameData for DataResponse {
-    fn from_data(id: u16, data: &[u8]) -> Result<Self, bitcode::Error> {
-        let data: DataResponseType = bitcode::decode(data)?;
-
-        Ok(Self { id, data })
-    }
-
-    fn to_data(&self) -> (u16, Vec<u8>) {
-        let data = bitcode::encode(&self.data);
-
-        (self.id, data)
-    }
-}
-
-impl FrameData for Handshake {
-    fn from_data(_: u16, data: &[u8]) -> Result<Self, bitcode::Error> {
-        let data: Self = bitcode::decode(data)?;
-
-        Ok(data)
-    }
-
-    fn to_data(&self) -> (u16, Vec<u8>) {
-        let data = bitcode::encode(self);
-
-        (0, data)
-    }
-}
+#[derive(Debug, Encode, Decode)]
+pub enum OneshotResponseType {}

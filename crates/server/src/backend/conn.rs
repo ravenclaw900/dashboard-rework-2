@@ -1,11 +1,11 @@
 use std::{collections::HashMap, net::IpAddr};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use config::PROTOCOL_VERSION;
 use log::{error, info, warn};
 use proto::{
-    DashboardSocket, FrameData,
-    types::{DataRequest, DataRequestType, DataResponse, DataResponseType, Handshake},
+    DashboardSocket,
+    types::{BackendMessage, BackendMessageType, FrontendMessage, FrontendMessageType, Handshake},
 };
 use tokio::{
     net::TcpStream,
@@ -16,7 +16,7 @@ use super::{SharedBackendRegistry, cache::BackendCache};
 
 enum ResponseChannel {
     NoResp,
-    Oneshot(oneshot::Sender<DataResponseType>),
+    Oneshot(oneshot::Sender<BackendMessageType>),
 }
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub struct BackendInfo {
 }
 
 struct BackendRequest {
-    req: DataRequestType,
+    req: FrontendMessageType,
     resp_tx: ResponseChannel,
 }
 
@@ -81,7 +81,7 @@ impl BackendConnection {
         self.registry.borrow_mut().remove(&self.addr);
     }
 
-    async fn read_frame<F: FrameData>(&mut self) -> Result<Option<F>> {
+    async fn read_frame(&mut self) -> Result<Option<BackendMessage>> {
         self.socket
             .read_frame()
             .await
@@ -89,10 +89,13 @@ impl BackendConnection {
     }
 
     async fn read_handshake(&mut self) -> Result<Handshake> {
-        let handshake: Handshake = self
+        let message = self
             .read_frame()
             .await
             .and_then(|opt| opt.context("peer disconnected before sending handshake"))?;
+        let BackendMessageType::Handshake(handshake) = message.data else {
+            return Err(anyhow!("peer sent invalid message, expected handshake"));
+        };
 
         Ok(handshake)
     }
@@ -102,7 +105,7 @@ impl BackendConnection {
         mut rx: mpsc::UnboundedReceiver<BackendRequest>,
     ) -> Result<()> {
         let mut next_id = 0;
-        let mut in_progress: HashMap<u16, oneshot::Sender<DataResponseType>> = HashMap::new();
+        let mut in_progress: HashMap<u16, oneshot::Sender<BackendMessageType>> = HashMap::new();
         let mut cache = BackendCache::new();
 
         loop {
@@ -119,7 +122,7 @@ impl BackendConnection {
                                 continue;
                             }
 
-                            let req = DataRequest { id: next_id, data: conn_req.req };
+                            let req = FrontendMessage { id: Some(next_id), data: conn_req.req };
 
                             self.socket
                                 .write_frame(req)
@@ -132,7 +135,7 @@ impl BackendConnection {
                             next_id += 1;
                         },
                         ResponseChannel::NoResp => {
-                            let req = DataRequest { id: next_id, data: conn_req.req };
+                            let req = FrontendMessage { id: None, data: conn_req.req };
 
                             self.socket
                                 .write_frame(req)
@@ -141,20 +144,22 @@ impl BackendConnection {
                         }
                     }
                 }
-                resp_result = self.read_frame::<DataResponse>() => {
+                resp_result = self.read_frame() => {
                     let Some(resp) = resp_result? else {
                         info!("Backend {} disconnected", self.addr);
                         break;
                     };
 
-                    let Some(resp_tx) = in_progress.remove(&resp.id) else {
-                        warn!("Received frame with unknown id {} from {}", resp.id, self.addr);
-                        continue;
-                    };
+                    if let Some(id) = resp.id {
+                            let Some(resp_tx) = in_progress.remove(&id) else {
+                                warn!("Received frame with unknown id {} from {}", id, self.addr);
+                                continue;
+                            };
 
-                    cache.insert(resp.data.clone());
+                        cache.insert(resp.data.clone());
 
-                    let _ = resp_tx.send(resp.data);
+                        let _ = resp_tx.send(resp.data);
+                    }
                 }
             }
         }
@@ -173,7 +178,7 @@ impl BackendHandle {
         Self { tx }
     }
 
-    pub async fn send_req_oneshot(&self, req: DataRequestType) -> Result<DataResponseType> {
+    pub async fn send_req_oneshot(&self, req: FrontendMessageType) -> Result<BackendMessageType> {
         let (resp_tx, resp_rx) = oneshot::channel();
         let resp_tx = ResponseChannel::Oneshot(resp_tx);
 
@@ -188,7 +193,7 @@ impl BackendHandle {
         Ok(resp)
     }
 
-    pub async fn send_req_noresp(&self, req: DataRequestType) -> Result<()> {
+    pub async fn send_req_noresp(&self, req: FrontendMessageType) -> Result<()> {
         let resp_tx = ResponseChannel::NoResp;
 
         self.tx

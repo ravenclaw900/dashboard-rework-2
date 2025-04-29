@@ -8,12 +8,12 @@ use crate::http::{
 
 macro_rules! fetch_data {
     ($req:expr, $variant:ident) => {{
-        use proto::types::{DataRequestType, DataResponseType};
+        use proto::types::{FrontendMessageType, BackendMessageType};
 
-        $req.send_backend_req_oneshot(DataRequestType::$variant)
+        $req.send_backend_req_oneshot(FrontendMessageType::$variant)
             .await
             .map(|resp| match resp {
-                DataResponseType::$variant(resp) => resp,
+                BackendMessageType::$variant(resp) => resp,
                 _ => unreachable!(),
             })
     }};

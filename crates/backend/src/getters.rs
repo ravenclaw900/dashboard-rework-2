@@ -1,6 +1,4 @@
-use std::path::{Path, PathBuf};
-
-use sysinfo::{Components, Disks, System};
+use std::path::PathBuf;
 
 use proto::types::{
     CpuResponse, DiskInfo, DiskResponse, MemResponse, NetworkResponse, TempResponse, UsageData,

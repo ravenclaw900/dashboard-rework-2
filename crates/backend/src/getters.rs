@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use proto::types::{
+use proto::backend::{
     CpuResponse, DiskInfo, DiskResponse, MemResponse, NetworkResponse, TempResponse, UsageData,
 };
 

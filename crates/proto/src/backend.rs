@@ -1,42 +1,29 @@
 use bitcode::{Decode, Encode};
 
 #[derive(Debug, Clone, Encode, Decode)]
-pub struct Handshake {
-    pub nickname: String,
-    pub version: u32,
-}
-
-#[derive(Debug, Encode, Decode)]
-pub struct FrontendMessage {
-    pub id: Option<u16>,
-    pub data: FrontendMessageType,
+pub enum BackendMessage {
+    NoId(NoIdBackendMessage),
+    Id(u16, IdBackendMessage),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
-pub enum FrontendMessageType {
-    Cpu,
-    Temp,
-    Mem,
-    Disk,
-    NetIO,
-    Terminal(Vec<u8>),
-}
-
-#[derive(Debug, Encode, Decode)]
-pub struct BackendMessage {
-    pub id: Option<u16>,
-    pub data: BackendMessageType,
-}
-
-#[derive(Debug, Clone, Encode, Decode)]
-pub enum BackendMessageType {
+pub enum NoIdBackendMessage {
     Handshake(Handshake),
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub enum IdBackendMessage {
     Cpu(CpuResponse),
     Temp(TempResponse),
     Mem(MemResponse),
     Disk(DiskResponse),
     NetIO(NetworkResponse),
-    Terminal(Vec<u8>),
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct Handshake {
+    pub nickname: String,
+    pub version: u32,
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -79,6 +66,3 @@ pub struct NetworkResponse {
     pub sent: u64,
     pub recv: u64,
 }
-
-#[derive(Debug, Encode, Decode)]
-pub enum OneshotResponseType {}

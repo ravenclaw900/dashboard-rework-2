@@ -2,12 +2,11 @@ use std::{
     collections::HashMap,
     net::IpAddr,
     ops::{Deref, DerefMut},
-    str::FromStr,
 };
 
 use config::frontend::FrontendConfig;
 use hyper::{StatusCode, body::Incoming, header};
-use proto::types::{FrontendMessageType, BackendMessageType};
+use proto::{backend::IdBackendMessage, frontend::IdFrontendMessage};
 
 use crate::{
     SharedConfig,
@@ -92,11 +91,11 @@ impl ServerRequest {
 
     pub async fn send_backend_req_oneshot(
         &self,
-        req: FrontendMessageType,
-    ) -> Result<BackendMessageType, ServerResponse> {
+        req: IdFrontendMessage,
+    ) -> Result<IdBackendMessage, ServerResponse> {
         let backend_handle = self.extract_backends()?.current_backend.1;
 
-        backend_handle.send_req_oneshot(req).await.map_err(|err| {
+        backend_handle.send_req_with_resp(req).await.map_err(|err| {
             ServerResponse::new()
                 .status(StatusCode::BAD_GATEWAY)
                 .body(format!("backend request failed: {err}"))

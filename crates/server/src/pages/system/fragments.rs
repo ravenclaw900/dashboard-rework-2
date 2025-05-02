@@ -1,6 +1,6 @@
 use maud::{Markup, html};
 use pretty_bytes_typed::{pretty_bytes, pretty_bytes_binary};
-use proto::types::{CpuResponse, DiskResponse, MemResponse, NetworkResponse, TempResponse};
+use proto::backend::{CpuResponse, DiskResponse, MemResponse, NetworkResponse, TempResponse};
 
 use super::graph::{Axis, SvgGraph};
 

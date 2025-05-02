@@ -4,26 +4,20 @@ use anyhow::{Context, Result};
 use config::{PROTOCOL_VERSION, backend::BackendConfig};
 use proto::{
     DashboardSocket,
-    types::{BackendMessage, BackendMessageType, FrontendMessage, FrontendMessageType, Handshake},
+    backend::{BackendMessage, Handshake, IdBackendMessage, NoIdBackendMessage},
+    frontend::{FrontendMessage, IdFrontendMessage},
 };
 use sysinfo::{Components, Disks, Networks, System};
 use tokio::{net::TcpStream, sync::mpsc};
 
 use crate::{SharedConfig, getters};
 
-macro_rules! call_getter {
-    (
-        blocking,
-        getter = $getter:path as $typ:path,
-        ctx = $ctx:expr,
-        id = $id:expr
-    ) => {{
-        let data = tokio::task::spawn_blocking(move || $getter($ctx))
-            .await
-            .unwrap();
-        let data = $typ(data);
-        BackendMessage { id: $id, data }
-    }};
+async fn call_blocking_getter<F, R>(ctx: BackendContext, getter: F) -> R
+where
+    F: FnOnce(BackendContext) -> R + Send + 'static,
+    R: Send + 'static,
+{
+    tokio::task::spawn_blocking(|| getter(ctx)).await.unwrap()
 }
 
 pub type SharedSystem = Arc<Mutex<SystemComponents>>;
@@ -112,13 +106,11 @@ impl BackendClient {
             version: PROTOCOL_VERSION,
         };
 
-        let message = BackendMessage {
-            id: None,
-            data: BackendMessageType::Handshake(handshake),
-        };
+        let msg = NoIdBackendMessage::Handshake(handshake);
+        let msg = BackendMessage::NoId(msg);
 
         self.socket
-            .write_frame(message)
+            .write_frame(msg)
             .await
             .context("failed to send handshake")
     }
@@ -140,40 +132,34 @@ impl RequestHandler {
     }
 
     async fn run(self) {
-        let resp = match self.req.data {
-            FrontendMessageType::Cpu => call_getter!(
-                blocking,
-                getter = getters::cpu as BackendMessageType::Cpu,
-                ctx = self.context,
-                id = self.req.id
-            ),
-            FrontendMessageType::Temp => call_getter!(
-                blocking,
-                getter = getters::temp as BackendMessageType::Temp,
-                ctx = self.context,
-                id = self.req.id
-            ),
-            FrontendMessageType::Mem => call_getter!(
-                blocking,
-                getter = getters::memory as BackendMessageType::Mem,
-                ctx = self.context,
-                id = self.req.id
-            ),
-            FrontendMessageType::Disk => {
-                call_getter!(
-                    blocking,
-                    getter = getters::disks as BackendMessageType::Disk,
-                    ctx = self.context,
-                    id = self.req.id
-                )
-            }
-            FrontendMessageType::NetIO => {
-                call_getter!(
-                    blocking,
-                    getter = getters::network_io as BackendMessageType::NetIO,
-                    ctx = self.context,
-                    id = self.req.id
-                )
+        let ctx = self.context.clone();
+
+        let resp = match self.req {
+            FrontendMessage::Id(id, req) => {
+                let resp = match req {
+                    IdFrontendMessage::Cpu => {
+                        let data = call_blocking_getter(ctx, getters::cpu).await;
+                        IdBackendMessage::Cpu(data)
+                    }
+                    IdFrontendMessage::Temp => {
+                        let data = call_blocking_getter(ctx, getters::temp).await;
+                        IdBackendMessage::Temp(data)
+                    }
+                    IdFrontendMessage::Mem => {
+                        let data = call_blocking_getter(ctx, getters::memory).await;
+                        IdBackendMessage::Mem(data)
+                    }
+                    IdFrontendMessage::Disk => {
+                        let data = call_blocking_getter(ctx, getters::disks).await;
+                        IdBackendMessage::Disk(data)
+                    }
+                    IdFrontendMessage::NetIO => {
+                        let data = call_blocking_getter(ctx, getters::network_io).await;
+                        IdBackendMessage::NetIO(data)
+                    }
+                };
+
+                BackendMessage::Id(id, resp)
             }
         };
 

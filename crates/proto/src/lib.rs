@@ -2,6 +2,8 @@ use anyhow::{Context, Result, anyhow};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+pub mod backend;
+pub mod frontend;
 pub mod types;
 
 const HEADER_LEN: usize = 2;

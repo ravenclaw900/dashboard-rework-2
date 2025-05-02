@@ -4,7 +4,6 @@ use tokio::net::TcpStream;
 
 pub mod backend;
 pub mod frontend;
-pub mod types;
 
 const HEADER_LEN: usize = 2;
 const MAX_FRAME_LEN: usize = 8192;

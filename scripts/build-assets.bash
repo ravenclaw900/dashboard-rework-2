@@ -5,7 +5,6 @@ dist_path='crates/server/dist'
 
 js_assets=(
   "$asset_path/js/xterm-5.5.0.js"
-  "$asset_path/js/xterm-addon-attach-0.11.0.js"
   "$asset_path/js/microlight-0.0.7.js"
   "$asset_path/js/components.js"
 )

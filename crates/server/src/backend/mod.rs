@@ -1,8 +1,7 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     net::{IpAddr, Ipv6Addr, SocketAddr},
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use anyhow::{Context, Result};
@@ -16,7 +15,7 @@ mod conn;
 pub use conn::BackendHandle;
 
 pub type BackendRegistry = HashMap<IpAddr, BackendInfo>;
-pub type SharedBackendRegistry = Rc<RefCell<BackendRegistry>>;
+pub type SharedBackendRegistry = Arc<Mutex<BackendRegistry>>;
 
 pub struct BackendServer {
     listener: TcpListener,
@@ -49,7 +48,7 @@ impl BackendServer {
 
             let conn = BackendConnection::new(stream, self.registry.clone(), peer_ip);
 
-            tokio::task::spawn_local(conn.handle_connection());
+            tokio::spawn(conn.handle_connection());
         }
     }
 }

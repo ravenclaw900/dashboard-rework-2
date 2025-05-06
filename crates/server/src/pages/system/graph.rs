@@ -112,10 +112,12 @@ impl Render for SvgGraph {
                     });
                     @let polyline_points = {
                         use core::fmt::Write;
-                        points.clone().fold(String::new(), |mut acc, (x, y)| {
-                            let _ = write!(&mut acc, "{x},{y} ");
-                            acc
-                        })
+
+                        let mut acc = String::new();
+                        for (x, y) in points.clone() {
+                            let _ = write!(acc, "{x},{y} ");
+                        }
+                        acc
                     };
                     g fill=(&series.color) {
                         @for (x, y) in points {

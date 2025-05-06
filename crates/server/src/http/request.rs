@@ -4,9 +4,18 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use config::frontend::FrontendConfig;
-use hyper::{StatusCode, body::Incoming, header};
+use data_encoding::BASE64;
+use http_body_util::BodyExt;
+use hyper::{
+    StatusCode,
+    body::Incoming,
+    header::{self, HeaderValue},
+    upgrade::{self, Upgraded},
+};
+use hyper_util::rt::TokioIo;
 use proto::{backend::IdBackendMessage, frontend::IdFrontendMessage};
+use ring::digest::SHA1_FOR_LEGACY_USE_ONLY;
+use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
 
 use crate::{
     SharedConfig,
@@ -55,9 +64,8 @@ impl ServerRequest {
         }
     }
 
-    // This function should only be called if the correct middleware was used to add the extension
     pub fn extract_backends(&self) -> Result<BackendData, ServerResponse> {
-        let backends = self.backends.borrow();
+        let backends = self.backends.lock().unwrap();
         let backend_list: Vec<_> = backends
             .iter()
             .map(|(addr, info)| (*addr, info.nickname.clone()))
@@ -102,7 +110,7 @@ impl ServerRequest {
         })
     }
 
-    pub fn extract_query<'a, Qu: serde::Deserialize<'a>>(&'a self) -> Result<Qu, ServerResponse> {
+    pub fn extract_query<Qu: serde::de::DeserializeOwned>(&self) -> Result<Qu, ServerResponse> {
         let query = self.uri().query().unwrap_or_default();
 
         serde_urlencoded::from_str(query).map_err(|_| {
@@ -112,12 +120,76 @@ impl ServerRequest {
         })
     }
 
+    pub async fn extract_form<T: serde::de::DeserializeOwned>(self) -> Result<T, ServerResponse> {
+        let body = self.req.into_body().collect().await.map_err(|_| {
+            ServerResponse::new()
+                .status(StatusCode::BAD_REQUEST)
+                .body("needs body")
+        })?;
+
+        serde_urlencoded::from_bytes(&body.to_bytes()).map_err(|_| {
+            ServerResponse::new()
+                .status(StatusCode::BAD_REQUEST)
+                .body("invalid form body")
+        })
+    }
+
     pub fn is_fixi(&self) -> bool {
         self.headers().contains_key("fx-request")
     }
 
-    pub fn config(&self) -> &FrontendConfig {
-        &self.config
+    pub fn extract_websocket<F, Fut>(self, handler_fn: F) -> Result<ServerResponse, ServerResponse>
+    where
+        F: FnOnce(WebSocketStream<TokioIo<Upgraded>>) -> Fut + Send + 'static,
+        Fut: Future + Send,
+    {
+        const WEBSOCKET_MAGIC_NUM: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+        let check_header = |k, v: &[u8]| {
+            self.headers()
+                .get(k)
+                .map(|x| x.as_bytes())
+                .is_some_and(|x| x.windows(v.len()).any(|subslice| subslice == v))
+        };
+
+        let is_websocket_req = check_header(header::CONNECTION, b"Upgrade")
+            && check_header(header::UPGRADE, b"websocket")
+            && check_header(header::SEC_WEBSOCKET_VERSION, b"13")
+            && self.headers().contains_key(header::SEC_WEBSOCKET_KEY);
+
+        if !is_websocket_req {
+            return Err(ServerResponse::new()
+                .status(StatusCode::BAD_REQUEST)
+                .body("expected websocket upgrade"));
+        }
+
+        let sec_key = self
+            .headers()
+            .get(header::SEC_WEBSOCKET_KEY)
+            .unwrap()
+            .as_bytes();
+
+        let resp_key = ring::digest::digest(
+            &SHA1_FOR_LEGACY_USE_ONLY,
+            &[sec_key, WEBSOCKET_MAGIC_NUM].concat(),
+        );
+        let resp_key = BASE64.encode(resp_key.as_ref());
+
+        let resp = ServerResponse::new()
+            .status(StatusCode::SWITCHING_PROTOCOLS)
+            .header(header::CONNECTION, "Upgrade")
+            .header(header::UPGRADE, "websocket")
+            .header(header::SEC_WEBSOCKET_ACCEPT, resp_key);
+
+        tokio::spawn(async {
+            if let Ok(stream) = upgrade::on(self.req).await {
+                let stream = TokioIo::new(stream);
+                let ws = WebSocketStream::from_raw_socket(stream, Role::Server, None).await;
+                handler_fn(ws).await;
+            }
+        });
+
+        Ok(resp)
     }
 }
 
@@ -157,7 +229,7 @@ impl QueryArray {
         let mut inner = String::new();
 
         for item in iter {
-            write!(inner, "{item},");
+            let _ = write!(inner, "{item},");
         }
 
         Self(inner)

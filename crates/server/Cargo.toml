@@ -9,18 +9,24 @@ license.workspace = true
 anyhow.workspace = true
 bitcode.workspace = true
 config = { workspace = true, features = ["frontend"] }
+data-encoding = "2.9.0"
 ephemeropt = "0.3.0"
 fastrand = "2.3.0"
 flexible-hyper-server-tls = { version = "0.6.0", default-features = false, features = ["ring", "rustls_helpers"] }
+futures-util = "0.3.31"
 getrandom = "0.3.1"
 http-body-util = "0.1.2"
 hyper = "1.5.0"
+hyper-util = { version = "0.1.11", features = ["tokio"] }
 log.workspace = true
 maud = "0.26.0"
 pretty-bytes-typed = "0.2.0"
 proto.workspace = true
+ring = "0.17.14"
 serde.workspace = true
 serde_urlencoded = "0.7.1"
 simple_logger.workspace = true
+slab = "0.4.9"
 strum = { version = "0.27.1", features = ["derive"] }
 tokio = { workspace = true, features = ["rt", "macros"] }
+tokio-tungstenite = { version = "0.26.2", default-features = false }

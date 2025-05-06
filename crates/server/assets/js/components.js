@@ -41,25 +41,16 @@
                     if (!resp.ok)
                         throw new Error(`${resp.statusText}: ${text}`);
 
-                    const doSwap = () => {
-                        if (target)
-                            target.outerHTML = text;
-                    };
-
-                    if (document.startViewTransition) {
-                        document.startViewTransition(doSwap);
-                    } else {
-                        doSwap();
-                    };
+                    if (target)
+                        target.outerHTML = text;
                 } catch (err) {
                     document.querySelector("main").innerText = `Error: ${err.message}`;
                 }
             };
 
-            if (trigger === "delay")
-                setTimeout(swap, 2000);
-            else
-                this.addEventListener(trigger, swap);
+            this.addEventListener(trigger, swap);
+
+            setTimeout(() => this.dispatchEvent(new Event("delay")), 2000);
         }
     }
 
@@ -69,7 +60,13 @@
         connectedCallback() {
             const term = new Terminal();
             term.open(this);
-            term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ');
+
+            const socket = new WebSocket("/terminal/ws");
+            socket.binaryType = "arraybuffer";
+
+            socket.onmessage = (e) => term.write(new Uint8Array(e.data));
+
+            term.onData((data) => socket.send(data));
         }
     }
 

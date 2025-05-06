@@ -1,16 +1,19 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use client::{BackendClient, SystemComponents};
+use client::{BackendClient, BackendContext, SystemComponents};
 use config::{
     APP_VERSION,
     backend::{BackendConfig, get_config},
 };
 use log::{error, info};
 use simple_logger::SimpleLogger;
+use terminal::Terminal;
+use tokio::sync::mpsc;
 
 mod client;
 mod getters;
+mod terminal;
 
 pub type SharedConfig = Arc<BackendConfig>;
 
@@ -27,13 +30,22 @@ async fn main() -> Result<()> {
 
     info!("Connecting to {}", config.frontend_addr);
 
+    let (term_tx, term_rx) = mpsc::unbounded_channel();
+    let (socket_tx, socket_rx) = mpsc::unbounded_channel();
+
+    let terminal = Terminal::new(socket_tx.clone(), term_rx).context("terminal build error")?;
+
     let system = Arc::new(Mutex::new(SystemComponents::new()));
+    let context = BackendContext {
+        config,
+        system,
+        term_tx,
+        socket_tx,
+    };
 
-    let client = BackendClient::new(config.clone(), system.clone()).await?;
+    let client = BackendClient::new(context, socket_rx).await?;
 
-    if let Err(err) = client.run().await {
-        error!("Connection error: {err:#}");
-    }
+    let _ = tokio::join!(client.run(), terminal.run());
 
     Ok(())
 }

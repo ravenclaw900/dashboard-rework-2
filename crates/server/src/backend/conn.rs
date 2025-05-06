@@ -1,13 +1,17 @@
-use std::{collections::HashMap, net::IpAddr};
+use std::{
+    collections::{HashMap, VecDeque},
+    net::IpAddr,
+};
 
 use anyhow::{Context, Result, anyhow};
 use config::PROTOCOL_VERSION;
 use log::{error, info, warn};
 use proto::{
-    DashboardSocket, // types::{BackendMessageType, FrontendMessage},
+    DashboardSocket,
     backend::{BackendMessage, Handshake, IdBackendMessage, NoIdBackendMessage},
-    frontend::{FrontendMessage, IdFrontendMessage},
+    frontend::{FrontendMessage, IdFrontendMessage, NoIdFrontendMessage},
 };
+use slab::Slab;
 use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot},
@@ -21,10 +25,17 @@ pub struct BackendInfo {
     pub handle: BackendHandle,
 }
 
+#[derive(Debug)]
 enum BackendRequest {
     WithResp {
         req: IdFrontendMessage,
         resp_tx: oneshot::Sender<IdBackendMessage>,
+    },
+    WithoutResp {
+        msg: NoIdFrontendMessage,
+    },
+    PushTerminalHandle {
+        term_tx: mpsc::UnboundedSender<Vec<u8>>,
     },
 }
 
@@ -70,13 +81,13 @@ impl BackendConnection {
             handle: BackendHandle::new(tx),
         };
 
-        self.registry.borrow_mut().insert(self.addr, conn_info);
+        self.registry.lock().unwrap().insert(self.addr, conn_info);
 
         if let Err(err) = self.handle_requests(rx).await {
             error!("Error handling requests for backend {}: {err:#}", self.addr)
         }
 
-        self.registry.borrow_mut().remove(&self.addr);
+        self.registry.lock().unwrap().remove(&self.addr);
     }
 
     async fn read_frame(&mut self) -> Result<Option<BackendMessage>> {
@@ -102,8 +113,9 @@ impl BackendConnection {
         &mut self,
         mut rx: mpsc::UnboundedReceiver<BackendRequest>,
     ) -> Result<()> {
-        let mut next_id = 0;
-        let mut in_progress: HashMap<u16, oneshot::Sender<IdBackendMessage>> = HashMap::new();
+        let mut in_progress: Slab<oneshot::Sender<IdBackendMessage>> = Slab::new();
+        let mut term_txs = Vec::new();
+        let mut term_buf = VecDeque::with_capacity(1000);
         let mut cache = BackendCache::new();
 
         loop {
@@ -120,18 +132,29 @@ impl BackendConnection {
                                 continue;
                             }
 
-                            let msg = FrontendMessage::Id(next_id, req);
+                            // Save response channel so we can send to it when we receive a response
+                            let id = in_progress.insert(resp_tx) as u16;
+
+                            let msg = FrontendMessage::Id(id, req);
 
                             self.socket
                                 .write_frame(msg)
                                 .await
                                 .context("failed to write request frame")?;
+                        },
+                        BackendRequest::WithoutResp { msg } => {
+                            let msg = FrontendMessage::NoId(msg);
 
-                            // Save response channel so we can send to it when we receive a response
-                            in_progress.insert(next_id, resp_tx);
-
-                            next_id += 1;
-                        }
+                            self.socket
+                                .write_frame(msg)
+                                .await
+                                .context("failed to write action frame")?;
+                        },
+                        BackendRequest::PushTerminalHandle { term_tx } => {
+                            if term_tx.send(term_buf.make_contiguous().to_vec()).is_ok() {
+                                term_txs.push(term_tx);
+                            }
+                        },
                     }
                 }
                 resp_result = self.read_frame() => {
@@ -142,7 +165,7 @@ impl BackendConnection {
 
                     match resp {
                         BackendMessage::Id(id, data) => {
-                            let Some(resp_tx) = in_progress.remove(&id) else {
+                            let Some(resp_tx) = in_progress.try_remove(id as usize) else {
                                 warn!("Received frame with unknown id {} from {}", id, self.addr);
                                 continue;
                             };
@@ -151,9 +174,23 @@ impl BackendConnection {
 
                             let _ = resp_tx.send(data);
                         },
-                        BackendMessage::NoId(_) => {
-                            warn!("Received unexpected message from backend {} (possibly extraneous handshake)", self.addr);
-                            continue;
+                        BackendMessage::NoId(msg) => {
+                            match msg {
+                                NoIdBackendMessage::Handshake(_) => {
+                                    warn!("Received extraneous handshake from backend {}", self.addr);
+                                    continue;
+                                },
+                                NoIdBackendMessage::Terminal(data) => {
+                                    for &x in &data {
+                                        if term_buf.len() == term_buf.capacity() {
+                                            term_buf.pop_front();
+                                        }
+                                        term_buf.push_back(x);
+                                    }
+
+                                    term_txs.retain(|tx| tx.send(data.clone()).is_ok());
+                                }
+                            }
                         }
                     }
                 }
@@ -187,5 +224,25 @@ impl BackendHandle {
             .context("failed to recv response, connection likely closed")?;
 
         Ok(resp)
+    }
+
+    pub async fn send_req_without_resp(&self, msg: NoIdFrontendMessage) -> Result<()> {
+        let msg = BackendRequest::WithoutResp { msg };
+
+        self.tx
+            .send(msg)
+            .context("failed to send message, connection likely closed")
+    }
+
+    pub async fn get_terminal_handle(&self) -> Result<mpsc::UnboundedReceiver<Vec<u8>>> {
+        let (term_tx, term_rx) = mpsc::unbounded_channel();
+
+        let msg = BackendRequest::PushTerminalHandle { term_tx };
+
+        self.tx
+            .send(msg)
+            .context("failed to get terminal handle, connection likely closed")?;
+
+        Ok(term_rx)
     }
 }

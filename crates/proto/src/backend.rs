@@ -9,6 +9,7 @@ pub enum BackendMessage {
 #[derive(Debug, Clone, Encode, Decode)]
 pub enum NoIdBackendMessage {
     Handshake(Handshake),
+    Terminal(Vec<u8>),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]

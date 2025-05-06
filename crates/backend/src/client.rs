@@ -5,12 +5,12 @@ use config::{PROTOCOL_VERSION, backend::BackendConfig};
 use proto::{
     DashboardSocket,
     backend::{BackendMessage, Handshake, IdBackendMessage, NoIdBackendMessage},
-    frontend::{FrontendMessage, IdFrontendMessage},
+    frontend::{FrontendMessage, IdFrontendMessage, NoIdFrontendMessage},
 };
 use sysinfo::{Components, Disks, Networks, System};
 use tokio::{net::TcpStream, sync::mpsc};
 
-use crate::{SharedConfig, getters};
+use crate::{SharedConfig, getters, terminal};
 
 async fn call_blocking_getter<F, R>(ctx: BackendContext, getter: F) -> R
 where
@@ -42,40 +42,41 @@ impl SystemComponents {
 
 #[derive(Clone)]
 pub struct BackendContext {
-    config: SharedConfig,
-    system: SharedSystem,
+    pub config: SharedConfig,
+    pub system: SharedSystem,
+    pub socket_tx: mpsc::UnboundedSender<BackendMessage>,
+    pub term_tx: mpsc::UnboundedSender<Vec<u8>>,
 }
 
 impl BackendContext {
     pub fn system(&mut self) -> impl std::ops::DerefMut<Target = SystemComponents> {
         self.system.lock().unwrap()
     }
-
-    pub fn config(&self) -> &BackendConfig {
-        &self.config
-    }
 }
 
 pub struct BackendClient {
     socket: DashboardSocket,
     context: BackendContext,
+    rx: mpsc::UnboundedReceiver<BackendMessage>,
 }
 
 impl BackendClient {
-    pub async fn new(config: SharedConfig, system: SharedSystem) -> Result<Self> {
-        let stream = TcpStream::connect(config.frontend_addr)
+    pub async fn new(
+        context: BackendContext,
+        rx: mpsc::UnboundedReceiver<BackendMessage>,
+    ) -> Result<Self> {
+        let stream = TcpStream::connect(context.config.frontend_addr)
             .await
             .context("failed to connect to frontend")?;
 
         Ok(Self {
             socket: DashboardSocket::new(stream),
-            context: BackendContext { config, system },
+            context,
+            rx,
         })
     }
 
     pub async fn run(mut self) -> Result<()> {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-
         self.send_handshake().await?;
 
         loop {
@@ -85,10 +86,10 @@ impl BackendClient {
                         .context("failed to read frame from frontend")?
                         .context("frontend unexpectedly disconnected")?;
 
-                    let handler = RequestHandler::new(tx.clone(), req, self.context.clone());
+                    let handler = RequestHandler::new(req, self.context.clone());
                     tokio::spawn(handler.run());
                 }
-                chan_result = rx.recv() => {
+                chan_result = self.rx.recv() => {
                     // Since we hold a copy of the sender, it should be impossible for this to return None
                     let frame = chan_result.unwrap();
 
@@ -117,24 +118,19 @@ impl BackendClient {
 }
 
 struct RequestHandler {
-    tx: mpsc::UnboundedSender<BackendMessage>,
     req: FrontendMessage,
     context: BackendContext,
 }
 
 impl RequestHandler {
-    fn new(
-        tx: mpsc::UnboundedSender<BackendMessage>,
-        req: FrontendMessage,
-        context: BackendContext,
-    ) -> Self {
-        Self { tx, req, context }
+    fn new(req: FrontendMessage, context: BackendContext) -> Self {
+        Self { req, context }
     }
 
     async fn run(self) {
         let ctx = self.context.clone();
 
-        let resp = match self.req {
+        match self.req {
             FrontendMessage::Id(id, req) => {
                 let resp = match req {
                     IdFrontendMessage::Cpu => {
@@ -159,10 +155,12 @@ impl RequestHandler {
                     }
                 };
 
-                BackendMessage::Id(id, resp)
+                let resp = BackendMessage::Id(id, resp);
+                let _ = self.context.socket_tx.send(resp);
             }
-        };
-
-        let _ = self.tx.send(resp);
+            FrontendMessage::NoId(NoIdFrontendMessage::Terminal(msg)) => {
+                let _ = self.context.term_tx.send(msg);
+            }
+        }
     }
 }

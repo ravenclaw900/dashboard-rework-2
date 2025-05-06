@@ -4,10 +4,6 @@
     box-sizing: border-box;
 }
 
-@view-transition {
-    navigation: auto;
-}
-
 body {
     display: grid;
     grid-template-columns: var(--size-13) auto;

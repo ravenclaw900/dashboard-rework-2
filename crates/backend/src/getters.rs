@@ -61,7 +61,7 @@ pub fn memory(mut ctx: BackendContext) -> MemResponse {
 }
 
 pub fn disks(mut ctx: BackendContext) -> DiskResponse {
-    let mnt_points = &ctx.config().disks;
+    let mnt_points = &ctx.config.disks;
     let mnt_points: Vec<_> = mnt_points.iter().map(PathBuf::from).collect();
 
     let disks = &mut ctx.system().disks;

@@ -59,7 +59,7 @@ impl HttpServer {
             });
 
             if let Ok((_, conn_fut)) = self.acceptor.accept(service).await {
-                tokio::task::spawn_local(async move {
+                tokio::spawn(async move {
                     if let Err(err) = conn_fut.await {
                         error!("Error serving HTTP connection: {err}");
                     }

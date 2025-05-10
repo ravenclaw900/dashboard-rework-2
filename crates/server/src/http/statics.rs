@@ -1,28 +1,16 @@
-use hyper::{StatusCode, header};
+use hyper::header;
 
 use super::{request::ServerRequest, response::ServerResponse};
 
 macro_rules! static_file {
     ($name:ident, $path:literal, $mime:literal) => {
-        pub async fn $name(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+        pub async fn $name(_req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
             let file = include_bytes!($path);
-            let sum = include_str!(concat!($path, ".md5"));
 
-            let client_sum = req
-                .headers()
-                .get(header::IF_NONE_MATCH)
-                .and_then(|x| x.to_str().ok())
-                .unwrap_or_default();
-
-            if client_sum == sum {
-                Ok(ServerResponse::new().status(StatusCode::NOT_MODIFIED))
-            } else {
-                Ok(ServerResponse::new()
-                    .header(header::CONTENT_TYPE, $mime)
-                    .header(header::CONTENT_ENCODING, "gzip")
-                    .header(header::ETAG, sum)
-                    .body(&file[..]))
-            }
+            Ok(ServerResponse::new()
+                .header(header::CONTENT_TYPE, $mime)
+                .header(header::CONTENT_ENCODING, "gzip")
+                .body(&file[..]))
         }
     };
 }

@@ -1,7 +1,7 @@
 use std::{fs, io};
 
 use anyhow::{Context, Result};
-use toml_migrate::{ConfigMigrator, Migrate};
+use toml_migrate::Migrate;
 
 #[cfg(feature = "backend")]
 pub mod backend;
@@ -13,16 +13,26 @@ pub const PROTOCOL_VERSION: u32 = 1;
 
 macro_rules! generate_config_file {
     ($template:literal, $($key:ident = $val:expr),*) => {{
-        use serde::Serialize;
-        use toml_edit::ser::ValueSerializer;
-
-        $( let $key = Serialize::serialize(&($val), ValueSerializer::new()).unwrap(); )*
+        $( let $key = basic_toml::to_string(&($val)).unwrap(); )*
 
         format!(include_str!(concat!("../templates/", $template)), $($key = $key),*)
     }};
 }
 
 pub(crate) use generate_config_file;
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+struct Version {
+    #[serde(rename = "CONFIG_VERSION_DO_NOT_CHANGE", default)]
+    version: i64,
+}
+
+impl toml_migrate::Version for Version {
+    fn version(&self) -> i64 {
+        self.version
+    }
+}
 
 fn read_config<T: Migrate + Default>(
     config_name: &str,
@@ -43,9 +53,7 @@ fn read_config<T: Migrate + Default>(
         Err(e) => return Err(e).context("failed to read config file"),
     };
 
-    let migrator = ConfigMigrator::new("CONFIG_VERSION_DO_NOT_CHANGE").with_default_version(0);
-    let (config, migration_occurred) = migrator
-        .migrate_config(&config_str)
+    let (config, migration_occurred) = toml_migrate::migrate_config::<T, Version>(&config_str)
         .context("failed to migrate config file")?;
 
     if migration_occurred {

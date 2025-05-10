@@ -115,7 +115,7 @@ impl BackendConnection {
     ) -> Result<()> {
         let mut in_progress: Slab<oneshot::Sender<IdBackendMessage>> = Slab::new();
         let mut term_txs = Vec::new();
-        let mut term_buf = VecDeque::with_capacity(1000);
+        let mut term_buf = VecDeque::with_capacity(10_000);
         let mut cache = BackendCache::new();
 
         loop {

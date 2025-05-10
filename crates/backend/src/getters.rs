@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
 use proto::backend::{
-    CpuResponse, DiskInfo, DiskResponse, MemResponse, NetworkResponse, TempResponse, UsageData,
+    CpuResponse, DiskInfo, DiskResponse, MemResponse, NetworkResponse, ProcessInfo,
+    ProcessResponse, ProcessStatus, TempResponse, UsageData,
 };
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
 
 use crate::client::BackendContext;
 
@@ -30,7 +32,7 @@ pub fn temp(mut ctx: BackendContext) -> TempResponse {
     components.refresh();
     let components = components.list();
 
-    let known_sensor_names = ["coretemp Package"];
+    let known_sensor_names = ["coretemp Package", "tdie"];
 
     let temp = components
         .iter()
@@ -97,4 +99,37 @@ pub fn network_io(mut ctx: BackendContext) -> NetworkResponse {
     }
 
     resp
+}
+
+pub fn processes(mut ctx: BackendContext) -> ProcessResponse {
+    let sys = &mut ctx.system().system;
+
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::new()
+            .with_cpu()
+            .with_memory()
+            .with_cmd(UpdateKind::OnlyIfNotSet),
+    );
+
+    let processes = sys
+        .processes()
+        .iter()
+        .filter(|(_, proc)| !proc.cmd().is_empty())
+        .map(|(pid, proc)| ProcessInfo {
+            pid: pid.as_u32(),
+            name: proc.name().to_string_lossy().into(),
+            cpu: round_to_2(proc.cpu_usage()),
+            mem: proc.memory(),
+            status: match proc.status() {
+                sysinfo::ProcessStatus::Run => ProcessStatus::Running,
+                sysinfo::ProcessStatus::Sleep => ProcessStatus::Sleeping,
+                sysinfo::ProcessStatus::Stop => ProcessStatus::Paused,
+                _ => ProcessStatus::Other,
+            },
+        })
+        .collect();
+
+    ProcessResponse { processes }
 }

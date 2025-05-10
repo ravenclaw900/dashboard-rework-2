@@ -12,6 +12,6 @@ backend = []
 [dependencies]
 log.workspace = true
 serde.workspace = true
-toml_edit = { version = "0.22.22", features = ["serde"] }
-toml-migrate = "0.1.0"
+toml-migrate = { git = "https://github.com/ravenclaw900/toml-migrate" }
 anyhow.workspace = true
+basic-toml = "0.1.10"

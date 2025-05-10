@@ -16,7 +16,7 @@ fn calc_percent(used: u64, total: u64) -> f32 {
 
 fn calc_grid_span(num_elts: usize) -> usize {
     // Starting at two rows, we need roughly 1 row for every 2 elements
-    (num_elts + 1) / 2 + 1
+    num_elts.div_ceil(2) + 1
 }
 
 pub fn cpu_meters(cpu_data: &CpuResponse, temp_data: &TempResponse) -> Markup {

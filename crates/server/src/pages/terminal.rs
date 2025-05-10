@@ -1,8 +1,7 @@
 use maud::html;
 
 use futures_util::{SinkExt, StreamExt};
-use proto::frontend::{FrontendMessage, NoIdFrontendMessage};
-use serde::Deserialize;
+use proto::frontend::NoIdFrontendMessage;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::http::{request::ServerRequest, response::ServerResponse};

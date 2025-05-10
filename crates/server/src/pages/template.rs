@@ -2,7 +2,7 @@ use hyper::header;
 use maud::{DOCTYPE, Markup, Render, html};
 
 use crate::http::{
-    request::{BackendData, ServerRequest},
+    request::{BackendData, QueryArray, ServerRequest},
     response::ServerResponse,
 };
 
@@ -10,7 +10,7 @@ macro_rules! fetch_data {
     ($req:expr, $variant:ident) => {{
         use proto::{backend::IdBackendMessage, frontend::IdFrontendMessage};
 
-        $req.send_backend_req_oneshot(IdFrontendMessage::$variant)
+        $req.send_backend_req_with_resp(IdFrontendMessage::$variant)
             .await
             .map(|resp| match resp {
                 IdBackendMessage::$variant(resp) => resp,
@@ -45,7 +45,7 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                     h1 { "DietPi Dashboard" }
 
                     header {
-                        button onclick="body.classList.toggle('nav-closed')" {
+                        button onclick="body.classList.toggle('nav-closed')" style="display:contents" {
                             (Icon::new("fa6-solid-bars").size(48))
                         }
 
@@ -76,6 +76,10 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                         a href="/system" {
                             (Icon::new("fa6-solid-database"))
                             "System"
+                        }
+                        a href="/process" {
+                            (Icon::new("fa6-solid-microchip"))
+                            "Processes"
                         }
                         a href="/terminal" {
                             (Icon::new("fa6-solid-terminal"))

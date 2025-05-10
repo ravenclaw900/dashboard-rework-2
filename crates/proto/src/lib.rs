@@ -6,7 +6,6 @@ pub mod backend;
 pub mod frontend;
 
 const HEADER_LEN: usize = 2;
-const MAX_FRAME_LEN: usize = 8192;
 
 pub struct DashboardSocket {
     stream: TcpStream,
@@ -28,12 +27,6 @@ impl DashboardSocket {
         }
 
         let frame_len = u16::from_be_bytes(self.buf[0..2].try_into().unwrap()) as usize;
-
-        if frame_len > MAX_FRAME_LEN {
-            return Err(anyhow!(
-                "frame of len {frame_len} is greater than max frame len {MAX_FRAME_LEN}"
-            ));
-        }
 
         // If there aren't enough bytes to contain both the header and frame data, return
         // (but make sure enough space is reserved for incoming data)
@@ -76,10 +69,11 @@ impl DashboardSocket {
     pub async fn write_frame<F: bitcode::Encode>(&mut self, frame: F) -> Result<()> {
         let mut data = bitcode::encode(&frame);
 
-        if data.len() > MAX_FRAME_LEN {
+        if data.len() > u16::MAX as usize {
             return Err(anyhow!(
-                "frame of len {} is greater than max frame len {MAX_FRAME_LEN}",
-                data.len()
+                "frame of len {} is greater than max frame len {}",
+                data.len(),
+                u16::MAX
             ));
         }
 

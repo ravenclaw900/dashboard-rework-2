@@ -11,6 +11,7 @@ use simple_logger::SimpleLogger;
 use terminal::Terminal;
 use tokio::sync::mpsc;
 
+mod actions;
 mod client;
 mod getters;
 mod terminal;
@@ -34,6 +35,7 @@ async fn main() -> Result<()> {
     let (socket_tx, socket_rx) = mpsc::unbounded_channel();
 
     let terminal = Terminal::new(socket_tx.clone(), term_rx).context("terminal build error")?;
+    tokio::spawn(terminal.run());
 
     let system = Arc::new(Mutex::new(SystemComponents::new()));
     let context = BackendContext {
@@ -45,7 +47,9 @@ async fn main() -> Result<()> {
 
     let client = BackendClient::new(context, socket_rx).await?;
 
-    let _ = tokio::join!(client.run(), terminal.run());
+    if let Err(err) = client.run().await {
+        error!("{err:#}");
+    }
 
     Ok(())
 }

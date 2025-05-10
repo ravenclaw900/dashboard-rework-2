@@ -8,4 +8,5 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 bitcode.workspace = true
+serde.workspace = true
 tokio = { workspace = true, features = ["net", "io-util", "sync"] }

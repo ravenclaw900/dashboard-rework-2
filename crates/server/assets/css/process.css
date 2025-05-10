@@ -1,0 +1,33 @@
+.process-table {
+    th {
+        background-color: var(--dietpi-light);
+        height: var(--size-6);
+    }
+
+    th button {
+        width: 100%;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+    }
+
+    td {
+        border-bottom: var(--gray-6) solid var(--border-size-1);
+    }
+
+    tr:nth-child(odd) {
+        background-color: var(--gray-3);
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: var(--size-2);
+
+        width: 100%;
+    }
+}

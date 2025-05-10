@@ -19,6 +19,7 @@ pub enum IdBackendMessage {
     Mem(MemResponse),
     Disk(DiskResponse),
     NetIO(NetworkResponse),
+    Processes(ProcessResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -66,4 +67,26 @@ pub struct DiskInfo {
 pub struct NetworkResponse {
     pub sent: u64,
     pub recv: u64,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct ProcessResponse {
+    pub processes: Vec<ProcessInfo>,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub cpu: f32,
+    pub mem: u64,
+    pub status: ProcessStatus,
+}
+
+#[derive(Debug, Clone, Copy, Encode, Decode, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ProcessStatus {
+    Running,
+    Paused,
+    Sleeping,
+    Other,
 }

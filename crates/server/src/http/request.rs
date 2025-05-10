@@ -9,11 +9,14 @@ use http_body_util::BodyExt;
 use hyper::{
     StatusCode,
     body::Incoming,
-    header::{self, HeaderValue},
+    header,
     upgrade::{self, Upgraded},
 };
 use hyper_util::rt::TokioIo;
-use proto::{backend::IdBackendMessage, frontend::IdFrontendMessage};
+use proto::{
+    backend::IdBackendMessage,
+    frontend::{IdFrontendMessage, NoIdFrontendMessage},
+};
 use ring::digest::SHA1_FOR_LEGACY_USE_ONLY;
 use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
 
@@ -64,6 +67,10 @@ impl ServerRequest {
         }
     }
 
+    pub fn path_segments(&self) -> impl Iterator<Item = &str> {
+        self.uri().path().split('/').filter(|x| !x.is_empty())
+    }
+
     pub fn extract_backends(&self) -> Result<BackendData, ServerResponse> {
         let backends = self.backends.lock().unwrap();
         let backend_list: Vec<_> = backends
@@ -97,7 +104,7 @@ impl ServerRequest {
         })
     }
 
-    pub async fn send_backend_req_oneshot(
+    pub async fn send_backend_req_with_resp(
         &self,
         req: IdFrontendMessage,
     ) -> Result<IdBackendMessage, ServerResponse> {
@@ -108,6 +115,22 @@ impl ServerRequest {
                 .status(StatusCode::BAD_GATEWAY)
                 .body(format!("backend request failed: {err}"))
         })
+    }
+
+    pub async fn send_backend_req_without_resp(
+        &self,
+        msg: NoIdFrontendMessage,
+    ) -> Result<(), ServerResponse> {
+        let backend_handle = self.extract_backends()?.current_backend.1;
+
+        backend_handle
+            .send_req_without_resp(msg)
+            .await
+            .map_err(|err| {
+                ServerResponse::new()
+                    .status(StatusCode::BAD_GATEWAY)
+                    .body(format!("backend action failed: {err}"))
+            })
     }
 
     pub fn extract_query<Qu: serde::de::DeserializeOwned>(&self) -> Result<Qu, ServerResponse> {
@@ -209,7 +232,7 @@ impl DerefMut for ServerRequest {
 
 // Wrapper type that makes de/serialize multiple fields in a query param easier
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct QueryArray(String);
+pub struct QueryArray(pub String);
 
 impl QueryArray {
     pub fn to_iter<T>(&self) -> impl Iterator<Item = T> + Clone

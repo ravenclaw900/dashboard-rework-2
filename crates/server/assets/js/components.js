@@ -1,5 +1,5 @@
 (() => {
-    class ThemeSwitcher extends HTMLElement {
+    customElements.define("theme-switcher", class extends HTMLElement {
         connectedCallback() {
             let button = this.querySelector("button");
             this.meta = this.querySelector("meta[name='color-scheme']");
@@ -21,11 +21,9 @@
             this.darkIcon.style.display = this.isDark ? "" : "none";
             this.lightIcon.style.display = this.isDark ? "none" : "";
         }
-    }
+    });
 
-    customElements.define("theme-switcher", ThemeSwitcher);
-
-    class ServerSwap extends HTMLElement {
+    customElements.define("server-swap", class extends HTMLElement {
         connectedCallback() {
             let url = this.getAttribute("action") || window.location.href;
             const method = (this.getAttribute("method") || "GET").toUpperCase();
@@ -52,11 +50,9 @@
 
             setTimeout(() => this.dispatchEvent(new Event("delay")), 2000);
         }
-    }
+    });
 
-    customElements.define("server-swap", ServerSwap);
-
-    class WebTerminal extends HTMLElement {
+    customElements.define("web-terminal", class extends HTMLElement {
         connectedCallback() {
             const term = new Terminal();
             term.open(this);
@@ -68,7 +64,5 @@
 
             term.onData((data) => socket.send(data));
         }
-    }
-
-    customElements.define("web-terminal", WebTerminal);
+    });
 })();

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use config::{PROTOCOL_VERSION, backend::BackendConfig};
+use config::PROTOCOL_VERSION;
 use proto::{
     DashboardSocket,
     backend::{BackendMessage, Handshake, IdBackendMessage, NoIdBackendMessage},
@@ -10,7 +10,7 @@ use proto::{
 use sysinfo::{Components, Disks, Networks, System};
 use tokio::{net::TcpStream, sync::mpsc};
 
-use crate::{SharedConfig, getters, terminal};
+use crate::{SharedConfig, actions, getters};
 
 async fn call_blocking_getter<F, R>(ctx: BackendContext, getter: F) -> R
 where
@@ -153,6 +153,10 @@ impl RequestHandler {
                         let data = call_blocking_getter(ctx, getters::network_io).await;
                         IdBackendMessage::NetIO(data)
                     }
+                    IdFrontendMessage::Processes => {
+                        let data = call_blocking_getter(ctx, getters::processes).await;
+                        IdBackendMessage::Processes(data)
+                    }
                 };
 
                 let resp = BackendMessage::Id(id, resp);
@@ -160,6 +164,11 @@ impl RequestHandler {
             }
             FrontendMessage::NoId(NoIdFrontendMessage::Terminal(msg)) => {
                 let _ = self.context.term_tx.send(msg);
+            }
+            FrontendMessage::NoId(NoIdFrontendMessage::Signal(action)) => {
+                tokio::task::spawn_blocking(|| actions::process_signal(ctx, action))
+                    .await
+                    .unwrap();
             }
         }
     }

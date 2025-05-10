@@ -4,6 +4,10 @@
     box-sizing: border-box;
 }
 
+button, select, input {
+    font: inherit;
+}
+
 body {
     display: grid;
     grid-template-columns: var(--size-13) auto;
@@ -126,5 +130,16 @@ section {
         border-bottom: var(--border-size-2) solid light-dark(var(--gray-3), var(--gray-9));
 
         font-weight: var(--font-weight-5);
+    }
+}
+
+table {
+    width: 100%;
+
+    border-collapse: collapse;
+    border: var(--gray-1) solid var(--border-size-2);
+
+    td {
+        border-bottom: var(--gray-6) solid var(--border-size-1);
     }
 }

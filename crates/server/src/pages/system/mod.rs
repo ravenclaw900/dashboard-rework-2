@@ -11,19 +11,14 @@ use super::template::{fetch_data, template};
 mod fragments;
 mod graph;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SystemQuery {
-    #[serde(default)]
     cpu_points: QueryArray,
-    #[serde(default)]
     temp_points: QueryArray,
-    #[serde(default)]
     ram_points: QueryArray,
-    #[serde(default)]
     swap_points: QueryArray,
-    #[serde(default)]
     sent_points: QueryArray,
-    #[serde(default)]
     recv_points: QueryArray,
 }
 

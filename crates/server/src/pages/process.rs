@@ -57,6 +57,8 @@ fn table_header(name: &str, sort: ColumnSort, query: &ProcessQuery) -> Markup {
 }
 
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+    req.check_login()?;
+
     let query: ProcessQuery = req.extract_query()?;
 
     let mut processes = fetch_data!(req, Processes)?.processes;
@@ -126,6 +128,8 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
 }
 
 pub async fn signal(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+    req.check_login()?;
+
     let signal: SignalAction = req.extract_query()?;
 
     req.send_backend_req_without_resp(NoIdFrontendMessage::Signal(signal))

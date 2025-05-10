@@ -23,6 +23,8 @@ pub struct SystemQuery {
 }
 
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+    req.check_login()?;
+
     let query: SystemQuery = req.extract_query()?;
 
     let cpu_data = fetch_data!(req, Cpu)?;

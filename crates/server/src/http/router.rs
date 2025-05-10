@@ -13,7 +13,7 @@ macro_rules! router {
         $( ($method:pat, $paths:pat) => $handler:expr, )*
         _ => $fallback:expr,
     }) => {{
-        match ($req.method(), $path) {
+        match (&$req.method, $path) {
             $(
                 ($method, $paths) => match $handler($req).await {
                     Ok(resp) | Err(resp) => resp
@@ -33,6 +33,9 @@ pub async fn router(req: ServerRequest) -> Result<BuiltResponse, std::convert::I
         (GET, ["static", "icons.svg"]) => statics::icons,
 
         (GET, []) => async |_| { Ok(ServerResponse::new().redirect(RedirectType::Permanent, "/system")) },
+
+        (GET, ["login"]) => login::page,
+        (POST, ["login"]) => login::form,
 
         (GET, ["system"]) => system::page,
 

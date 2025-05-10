@@ -9,6 +9,8 @@ use crate::http::{request::ServerRequest, response::ServerResponse};
 use super::template::template;
 
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+    req.check_login()?;
+
     let content = html! {
         section {
             h2 { "Terminal" }
@@ -20,6 +22,8 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
 }
 
 pub async fn socket(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+    req.check_login()?;
+
     let backend = req.extract_backends()?.current_backend.1;
 
     req.extract_websocket(async move |mut ws| {

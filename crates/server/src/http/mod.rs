@@ -1,6 +1,10 @@
-use std::net::{Ipv6Addr, SocketAddr};
+use std::{
+    net::{Ipv6Addr, SocketAddr},
+    sync::{Arc, Mutex},
+};
 
 use anyhow::{Context, Result};
+use auth::{LoginMap, SharedLoginMap};
 use flexible_hyper_server_tls::{HttpOrHttpsAcceptor, rustls_helpers};
 use hyper::service::service_fn;
 use log::{error, info};
@@ -10,15 +14,22 @@ use tokio::net::TcpListener;
 
 use crate::{SharedConfig, backend::SharedBackendRegistry};
 
+pub mod auth;
 pub mod request;
 pub mod response;
 mod router;
 mod statics;
 
-pub struct HttpServer {
-    acceptor: HttpOrHttpsAcceptor,
+#[derive(Clone)]
+pub struct FrontendContext {
     backends: SharedBackendRegistry,
     config: SharedConfig,
+    logins: SharedLoginMap,
+}
+
+pub struct HttpServer {
+    acceptor: HttpOrHttpsAcceptor,
+    context: FrontendContext,
 }
 
 impl HttpServer {
@@ -41,20 +52,24 @@ impl HttpServer {
             acceptor = acceptor.with_tls(tls)
         }
 
+        let logins = SharedLoginMap::new();
+
         Ok(Self {
             acceptor,
-            backends,
-            config,
+            context: FrontendContext {
+                config,
+                logins,
+                backends,
+            },
         })
     }
 
     pub async fn run(self) {
         loop {
-            let backends = self.backends.clone();
-            let config = self.config.clone();
+            let ctx = self.context.clone();
 
             let service = service_fn(move |req| {
-                let req = ServerRequest::new(req, backends.clone(), config.clone());
+                let req = ServerRequest::new(req, ctx.clone());
                 async move { router(req).await }
             });
 

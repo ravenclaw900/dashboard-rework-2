@@ -18,4 +18,10 @@ cert_path = {cert_path}
 # Path to TLS private key
 key_path = {key_path}
 
+# Enable login
+# - Default: false
+enable_login = {enable_login}
+# SHA512 hash of password
+hash = {hash}
+
 CONFIG_VERSION_DO_NOT_CHANGE = 1

@@ -4,12 +4,14 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use config::frontend::FrontendConfig;
 use data_encoding::BASE64;
 use http_body_util::BodyExt;
 use hyper::{
     StatusCode,
     body::Incoming,
     header,
+    http::request::Parts as RequestParts,
     upgrade::{self, Upgraded},
 };
 use hyper_util::rt::TokioIo;
@@ -20,18 +22,19 @@ use proto::{
 use ring::digest::SHA1_FOR_LEGACY_USE_ONLY;
 use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
 
-use crate::{
-    SharedConfig,
-    backend::{BackendHandle, SharedBackendRegistry},
-};
+use crate::backend::BackendHandle;
 
-use super::response::ServerResponse;
+use super::{
+    FrontendContext,
+    auth::SharedLoginMap,
+    response::{RedirectType, ServerResponse},
+};
 
 pub type HyperRequest = hyper::Request<Incoming>;
 
-fn get_cookies(req: &HyperRequest) -> HashMap<String, String> {
-    let cookie_header = req
-        .headers()
+fn get_cookies(parts: &RequestParts) -> HashMap<String, String> {
+    let cookie_header = parts
+        .headers
         .get(header::COOKIE)
         .and_then(|x| x.to_str().ok())
         .unwrap_or_default();
@@ -49,30 +52,36 @@ pub struct BackendData {
 }
 
 pub struct ServerRequest {
-    req: HyperRequest,
+    parts: RequestParts,
+    body: Option<Incoming>,
     cookies: HashMap<String, String>,
-    backends: SharedBackendRegistry,
-    config: SharedConfig,
+    context: FrontendContext,
 }
 
 impl ServerRequest {
-    pub fn new(req: HyperRequest, backends: SharedBackendRegistry, config: SharedConfig) -> Self {
-        let cookies = get_cookies(&req);
+    pub fn new(req: HyperRequest, context: FrontendContext) -> Self {
+        let (parts, body) = req.into_parts();
+
+        let cookies = get_cookies(&parts);
 
         Self {
-            req,
+            parts,
+            body: Some(body),
             cookies,
-            backends,
-            config,
+            context,
         }
     }
 
     pub fn path_segments(&self) -> impl Iterator<Item = &str> {
-        self.uri().path().split('/').filter(|x| !x.is_empty())
+        self.uri.path().split('/').filter(|x| !x.is_empty())
+    }
+
+    pub fn config(&self) -> &FrontendConfig {
+        &self.context.config
     }
 
     pub fn extract_backends(&self) -> Result<BackendData, ServerResponse> {
-        let backends = self.backends.lock().unwrap();
+        let backends = self.context.backends.lock().unwrap();
         let backend_list: Vec<_> = backends
             .iter()
             .map(|(addr, info)| (*addr, info.nickname.clone()))
@@ -134,17 +143,25 @@ impl ServerRequest {
     }
 
     pub fn extract_query<Qu: serde::de::DeserializeOwned>(&self) -> Result<Qu, ServerResponse> {
-        let query = self.uri().query().unwrap_or_default();
+        let query = self.uri.query().unwrap_or_default();
 
-        serde_urlencoded::from_str(query).map_err(|_| {
+        serde_urlencoded::from_str(query).map_err(|err| {
             ServerResponse::new()
                 .status(StatusCode::BAD_REQUEST)
-                .body("invalid query params")
+                .body(format!("invalid query params: {err}"))
         })
     }
 
-    pub async fn extract_form<T: serde::de::DeserializeOwned>(self) -> Result<T, ServerResponse> {
-        let body = self.req.into_body().collect().await.map_err(|_| {
+    pub async fn extract_form<T: serde::de::DeserializeOwned>(
+        &mut self,
+    ) -> Result<T, ServerResponse> {
+        let Some(body) = self.body.take() else {
+            return Err(ServerResponse::new()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body("form already extracted"));
+        };
+
+        let body = body.collect().await.map_err(|_| {
             ServerResponse::new()
                 .status(StatusCode::BAD_REQUEST)
                 .body("needs body")
@@ -158,7 +175,7 @@ impl ServerRequest {
     }
 
     pub fn is_fixi(&self) -> bool {
-        self.headers().contains_key("fx-request")
+        self.headers.contains_key("fx-request")
     }
 
     pub fn extract_websocket<F, Fut>(self, handler_fn: F) -> Result<ServerResponse, ServerResponse>
@@ -169,7 +186,7 @@ impl ServerRequest {
         const WEBSOCKET_MAGIC_NUM: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
         let check_header = |k, v: &[u8]| {
-            self.headers()
+            self.headers
                 .get(k)
                 .map(|x| x.as_bytes())
                 .is_some_and(|x| x.windows(v.len()).any(|subslice| subslice == v))
@@ -178,7 +195,7 @@ impl ServerRequest {
         let is_websocket_req = check_header(header::CONNECTION, b"Upgrade")
             && check_header(header::UPGRADE, b"websocket")
             && check_header(header::SEC_WEBSOCKET_VERSION, b"13")
-            && self.headers().contains_key(header::SEC_WEBSOCKET_KEY);
+            && self.headers.contains_key(header::SEC_WEBSOCKET_KEY);
 
         if !is_websocket_req {
             return Err(ServerResponse::new()
@@ -187,7 +204,7 @@ impl ServerRequest {
         }
 
         let sec_key = self
-            .headers()
+            .headers
             .get(header::SEC_WEBSOCKET_KEY)
             .unwrap()
             .as_bytes();
@@ -204,8 +221,10 @@ impl ServerRequest {
             .header(header::UPGRADE, "websocket")
             .header(header::SEC_WEBSOCKET_ACCEPT, resp_key);
 
+        let req = hyper::Request::from_parts(self.parts, self.body.unwrap());
+
         tokio::spawn(async {
-            if let Ok(stream) = upgrade::on(self.req).await {
+            if let Ok(stream) = upgrade::on(req).await {
                 let stream = TokioIo::new(stream);
                 let ws = WebSocketStream::from_raw_socket(stream, Role::Server, None).await;
                 handler_fn(ws).await;
@@ -214,19 +233,44 @@ impl ServerRequest {
 
         Ok(resp)
     }
+
+    pub fn check_login(&self) -> Result<(), ServerResponse> {
+        if self.config().enable_login {
+            let err_resp = if self.is_fixi() {
+                Err(ServerResponse::new()
+                    .body(r#"<meta http-equiv="refresh" content="0; url=/login" />"#))
+            } else {
+                Err(ServerResponse::new().redirect(RedirectType::SeeOther, "/login"))
+            };
+
+            let Some(token) = self.cookies.get("token") else {
+                return err_resp;
+            };
+
+            if !self.context.logins.get().contains_token(token) {
+                return err_resp;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn extract_logins(&self) -> SharedLoginMap {
+        self.context.logins.clone()
+    }
 }
 
 impl Deref for ServerRequest {
-    type Target = HyperRequest;
+    type Target = RequestParts;
 
     fn deref(&self) -> &Self::Target {
-        &self.req
+        &self.parts
     }
 }
 
 impl DerefMut for ServerRequest {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.req
+        &mut self.parts
     }
 }
 

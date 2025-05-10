@@ -21,7 +21,9 @@ fn generate_config_file(config: &FrontendConfig) -> String {
         log_level = config.log_level,
         enable_tls = config.enable_tls,
         key_path = config.key_path,
-        cert_path = config.cert_path
+        cert_path = config.cert_path,
+        enable_login = config.enable_login,
+        hash = config.hash
     )
 }
 
@@ -35,6 +37,8 @@ pub struct FrontendConfigV1 {
     pub enable_tls: bool,
     pub cert_path: PathBuf,
     pub key_path: PathBuf,
+    pub enable_login: bool,
+    pub hash: String,
 }
 
 impl Default for FrontendConfigV1 {
@@ -46,6 +50,8 @@ impl Default for FrontendConfigV1 {
             enable_tls: false,
             cert_path: PathBuf::new(),
             key_path: PathBuf::new(),
+            enable_login: false,
+            hash: String::new(),
         }
     }
 }
@@ -61,6 +67,8 @@ impl From<FrontendConfigV0> for FrontendConfigV1 {
             enable_tls: val.tls.unwrap_or(default.enable_tls),
             cert_path: val.cert.unwrap_or(default.cert_path),
             key_path: val.key.unwrap_or(default.key_path),
+            enable_login: val.pass.unwrap_or(default.enable_login),
+            hash: val.hash.unwrap_or(default.hash),
         }
     }
 }
@@ -73,4 +81,6 @@ pub struct FrontendConfigV0 {
     pub tls: Option<bool>,
     pub cert: Option<PathBuf>,
     pub key: Option<PathBuf>,
+    pub pass: Option<bool>,
+    pub hash: Option<String>,
 }

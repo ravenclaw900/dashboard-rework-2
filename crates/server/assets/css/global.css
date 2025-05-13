@@ -36,8 +36,8 @@ h1 {
 
     background-color: light-dark(var(--dietpi-dark), var(--dietpi-teal-dark));
 
-    font-weight: var(--font-weight-4);
-    font-size: var(--font-size-5);
+    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-4);
     text-wrap: nowrap;
 }
 
@@ -99,7 +99,7 @@ nav {
 main {
     grid-area: main;
 
-    padding: var(--size-2);
+    padding: var(--size-4);
 }
 
 button:has(svg) {
@@ -129,7 +129,7 @@ section {
     >h2 {
         border-bottom: var(--border-size-2) solid light-dark(var(--gray-3), var(--gray-9));
 
-        font-weight: var(--font-weight-5);
+        font-weight: var(--font-weight-medium);
     }
 }
 
@@ -137,9 +137,14 @@ table {
     width: 100%;
 
     border-collapse: collapse;
-    border: var(--gray-1) solid var(--border-size-2);
+    border: light-dark(var(--gray-1), var(--gray-8)) solid var(--border-size-2);
 
     td {
         border-bottom: var(--gray-6) solid var(--border-size-1);
+        height: var(--size-7);
+    }
+
+    tr:nth-child(odd) {
+        background-color: light-dark(var(--gray-3), var(--gray-9));
     }
 }

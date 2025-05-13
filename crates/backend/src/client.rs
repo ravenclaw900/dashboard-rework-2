@@ -12,12 +12,13 @@ use tokio::{net::TcpStream, sync::mpsc};
 
 use crate::{SharedConfig, actions, getters};
 
-async fn call_blocking_getter<F, R>(ctx: BackendContext, getter: F) -> R
+async fn call_blocking_getter<T>(ctx: BackendContext, getter: fn(BackendContext) -> T) -> T
 where
-    F: FnOnce(BackendContext) -> R + Send + 'static,
-    R: Send + 'static,
+    T: Send + 'static,
 {
-    tokio::task::spawn_blocking(|| getter(ctx)).await.unwrap()
+    tokio::task::spawn_blocking(move || getter(ctx))
+        .await
+        .unwrap()
 }
 
 pub type SharedSystem = Arc<Mutex<SystemComponents>>;
@@ -156,6 +157,10 @@ impl RequestHandler {
                     IdFrontendMessage::Processes => {
                         let data = call_blocking_getter(ctx, getters::processes).await;
                         IdBackendMessage::Processes(data)
+                    }
+                    IdFrontendMessage::Host => {
+                        let data = call_blocking_getter(ctx, getters::host).await;
+                        IdBackendMessage::Host(data)
                     }
                 };
 

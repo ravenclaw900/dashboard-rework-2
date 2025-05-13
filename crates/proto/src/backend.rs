@@ -20,6 +20,7 @@ pub enum IdBackendMessage {
     Disk(DiskResponse),
     NetIO(NetworkResponse),
     Processes(ProcessResponse),
+    Host(HostResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -89,4 +90,14 @@ pub enum ProcessStatus {
     Paused,
     Sleeping,
     Other,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct HostResponse {
+    pub hostname: String,
+    pub nic: String,
+    pub arch: String,
+    pub uptime: u64,
+    pub kernel: String,
+    pub os_version: String,
 }

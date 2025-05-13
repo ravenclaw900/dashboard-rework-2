@@ -15,6 +15,7 @@ pub enum IdFrontendMessage {
     Disk,
     NetIO,
     Processes,
+    Host,
 }
 
 #[derive(Debug, Encode, Decode)]

@@ -81,6 +81,10 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                             (Icon::new("fa6-solid-microchip"))
                             "Processes"
                         }
+                        a href="/management" {
+                            (Icon::new("fa6-solid-user"))
+                            "Management"
+                        }
                         a href="/terminal" {
                             (Icon::new("fa6-solid-terminal"))
                             "Terminal"

@@ -1,0 +1,50 @@
+use std::time::Duration;
+
+use maud::html;
+
+use crate::http::{request::ServerRequest, response::ServerResponse};
+
+use super::template::{fetch_data, template};
+
+pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
+    req.check_login()?;
+
+    let data = fetch_data!(req, Host)?;
+
+    let pretty_time = humantime::format_duration(Duration::from_secs(data.uptime));
+
+    let content = html! {
+        section {
+            h2 { "Host Information" }
+
+            table .management-table {
+                tr {
+                    td { "Hostname" }
+                    td { (data.hostname) }
+                }
+                tr {
+                    td { "Network Interface" }
+                    td { (data.nic) }
+                }
+                tr {
+                    td { "Uptime" }
+                    td { (pretty_time) }
+                }
+                tr {
+                    td { "OS Version" }
+                    td { (data.os_version) }
+                }
+                tr {
+                    td { "Kernel Version" }
+                    td { (data.kernel) }
+                }
+                tr {
+                    td { "Architecture" }
+                    td { (data.arch) }
+                }
+            }
+        }
+    };
+
+    template(&req, content)
+}

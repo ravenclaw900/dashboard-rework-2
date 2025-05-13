@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use proto::backend::{
-    CpuResponse, DiskInfo, DiskResponse, MemResponse, NetworkResponse, ProcessInfo,
+    CpuResponse, DiskInfo, DiskResponse, HostResponse, MemResponse, NetworkResponse, ProcessInfo,
     ProcessResponse, ProcessStatus, TempResponse, UsageData,
 };
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 use crate::client::BackendContext;
 
@@ -132,4 +132,32 @@ pub fn processes(mut ctx: BackendContext) -> ProcessResponse {
         .collect();
 
     ProcessResponse { processes }
+}
+
+pub fn host(mut ctx: BackendContext) -> HostResponse {
+    let net = &ctx.system().networks;
+
+    let unknown = || "unknown".to_string();
+
+    let nic = net
+        .iter()
+        .max_by_key(|(_, net)| net.total_transmitted())
+        .map(|(name, _)| name)
+        .cloned()
+        .unwrap_or_else(unknown);
+
+    let uptime = System::uptime();
+    let arch = System::cpu_arch().unwrap_or_else(unknown);
+    let os_version = System::long_os_version().unwrap_or_else(unknown);
+    let kernel = System::kernel_version().unwrap_or_else(unknown);
+    let hostname = System::host_name().unwrap_or_else(unknown);
+
+    HostResponse {
+        nic,
+        uptime,
+        arch,
+        os_version,
+        kernel,
+        hostname,
+    }
 }

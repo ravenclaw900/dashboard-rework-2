@@ -1,6 +1,6 @@
 .process-table {
     th {
-        background-color: var(--dietpi-light);
+        background-color: light-dark(var(--dietpi-light), var(--dietpi-teal-light));
         height: var(--size-6);
     }
 
@@ -14,14 +14,6 @@
         background-color: transparent;
         border: none;
         cursor: pointer;
-    }
-
-    td {
-        border-bottom: var(--gray-6) solid var(--border-size-1);
-    }
-
-    tr:nth-child(odd) {
-        background-color: var(--gray-3);
     }
 
     .actions-cell {

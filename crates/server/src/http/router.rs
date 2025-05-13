@@ -42,6 +42,8 @@ pub async fn router(req: ServerRequest) -> Result<BuiltResponse, std::convert::I
         (GET, ["process"]) => process::page,
         (GET, ["process", "signal"]) => process::signal,
 
+        (GET, ["management"]) => management::page,
+
         (GET, ["terminal"]) => terminal::page,
         (GET, ["terminal", "ws"]) => terminal::socket,
 

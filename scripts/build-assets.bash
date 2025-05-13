@@ -14,6 +14,7 @@ css_assets=(
   "$asset_path/css/global.css"
   "$asset_path/css/system.css"
   "$asset_path/css/process.css"
+  "$asset_path/css/management.css"
   "$asset_path/css/xterm-5.5.0.css"
 )
 

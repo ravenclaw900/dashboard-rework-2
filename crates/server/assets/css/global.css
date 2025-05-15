@@ -139,8 +139,14 @@ table {
     border-collapse: collapse;
     border: light-dark(var(--gray-1), var(--gray-8)) solid var(--border-size-2);
 
+    th {
+        background-color: light-dark(var(--dietpi-light), var(--dietpi-teal-light));
+        height: var(--size-6);
+    }
+
     td {
         border-bottom: var(--gray-6) solid var(--border-size-1);
+        padding: var(--size-1);
         height: var(--size-7);
     }
 

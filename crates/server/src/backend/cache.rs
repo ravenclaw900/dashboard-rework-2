@@ -21,16 +21,18 @@ macro_rules! cache {
             pub fn get(&self, key: &IdFrontendMessage) -> Option<IdBackendMessage> {
                 match key {
                     $( IdFrontendMessage::$discrim => self.$key.get().cloned(), )*
+                    _ => None,
                 }
             }
 
             pub fn insert(&mut self, val: IdBackendMessage) {
                 match val {
                     $( IdBackendMessage::$discrim(_) => { self.$key.insert(val); }, )*
+                    _ => {}
                 };
             }
         }
     };
 }
 
-cache!(BackendCache, [cpu: Cpu, temp: Temp, mem: Mem, disk: Disk, net_io: NetIO, processes: Processes, host: Host]);
+cache!(BackendCache, [cpu: Cpu, temp: Temp, mem: Mem, disk: Disk, net_io: NetIO, processes: Processes]);

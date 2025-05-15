@@ -32,13 +32,13 @@ pub fn cpu_meters(cpu_data: &CpuResponse, temp_data: &TempResponse) -> Markup {
                 p { "CPU Temperature: " (temp) "ºC" }
             }
             p { "Global CPU: " (cpu_data.global_cpu) "%" }
-            div .meter-container {
-                div .bar.-cpu style={"--scale:"(cpu_data.global_cpu / 100.)} {}
+            .meter-container {
+                .bar.-cpu style={"--scale:"(cpu_data.global_cpu / 100.)} {}
             }
             @for (usage, num) in cpu_iter {
                 p { "CPU "(num)": "(usage)"%" }
-                div .meter-container {
-                    div .bar.-cpu style={"--scale:"(usage / 100.)} {}
+                .meter-container {
+                    .bar.-cpu style={"--scale:"(usage / 100.)} {}
                 }
             }
         }

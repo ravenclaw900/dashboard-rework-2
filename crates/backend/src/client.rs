@@ -12,13 +12,17 @@ use tokio::{net::TcpStream, sync::mpsc};
 
 use crate::{SharedConfig, actions, getters};
 
-async fn call_blocking_getter<T>(ctx: BackendContext, getter: fn(BackendContext) -> T) -> T
-where
-    T: Send + 'static,
-{
-    tokio::task::spawn_blocking(move || getter(ctx))
-        .await
-        .unwrap()
+macro_rules! getters {
+    ($req:expr, $ctx:expr, {
+        $( $variant:ident => $fn:path, )*
+    }) => {
+        match $req {
+            $( IdFrontendMessage::$variant => {
+                let data = tokio::task::spawn_blocking(move || $fn($ctx)).await.unwrap();
+                IdBackendMessage::$variant(data)
+            } )*
+        }
+    };
 }
 
 pub type SharedSystem = Arc<Mutex<SystemComponents>>;
@@ -133,36 +137,16 @@ impl RequestHandler {
 
         match self.req {
             FrontendMessage::Id(id, req) => {
-                let resp = match req {
-                    IdFrontendMessage::Cpu => {
-                        let data = call_blocking_getter(ctx, getters::cpu).await;
-                        IdBackendMessage::Cpu(data)
-                    }
-                    IdFrontendMessage::Temp => {
-                        let data = call_blocking_getter(ctx, getters::temp).await;
-                        IdBackendMessage::Temp(data)
-                    }
-                    IdFrontendMessage::Mem => {
-                        let data = call_blocking_getter(ctx, getters::memory).await;
-                        IdBackendMessage::Mem(data)
-                    }
-                    IdFrontendMessage::Disk => {
-                        let data = call_blocking_getter(ctx, getters::disks).await;
-                        IdBackendMessage::Disk(data)
-                    }
-                    IdFrontendMessage::NetIO => {
-                        let data = call_blocking_getter(ctx, getters::network_io).await;
-                        IdBackendMessage::NetIO(data)
-                    }
-                    IdFrontendMessage::Processes => {
-                        let data = call_blocking_getter(ctx, getters::processes).await;
-                        IdBackendMessage::Processes(data)
-                    }
-                    IdFrontendMessage::Host => {
-                        let data = call_blocking_getter(ctx, getters::host).await;
-                        IdBackendMessage::Host(data)
-                    }
-                };
+                let resp = getters!(req, ctx, {
+                    Cpu => getters::cpu,
+                    Temp => getters::temp,
+                    Mem => getters::memory,
+                    Disk => getters::disks,
+                    NetIO => getters::network_io,
+                    Processes => getters::processes,
+                    Host => getters::host,
+                    Software => getters::software,
+                });
 
                 let resp = BackendMessage::Id(id, resp);
                 let _ = self.context.socket_tx.send(resp);

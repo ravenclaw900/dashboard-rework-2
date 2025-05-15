@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf, process::Command};
 
 use proto::backend::{
     CpuResponse, DiskInfo, DiskResponse, HostResponse, MemResponse, NetworkResponse, ProcessInfo,
-    ProcessResponse, ProcessStatus, TempResponse, UsageData,
+    ProcessResponse, ProcessStatus, SoftwareInfo, SoftwareResponse, TempResponse, UsageData,
 };
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
@@ -152,6 +152,26 @@ pub fn host(mut ctx: BackendContext) -> HostResponse {
     let kernel = System::kernel_version().unwrap_or_else(unknown);
     let hostname = System::host_name().unwrap_or_else(unknown);
 
+    let dp_file = fs::read_to_string("/boot/dietpi/.version").ok();
+    let dp_version = dp_file
+        .and_then(|file| {
+            let mut fields = file.split(['=', '\n']);
+
+            // Extract items 1, 3, and 5
+            Some(format!(
+                "{}.{}.{}",
+                fields.nth(1)?,
+                fields.nth(1)?,
+                fields.nth(1)?
+            ))
+        })
+        .unwrap_or_else(unknown);
+
+    let pkg_list = Command::new("dpkg").arg("--get-selections").output().ok();
+    let num_pkgs = pkg_list
+        .map(|output| output.stdout.into_iter().filter(|&x| x == b'\n').count())
+        .unwrap_or(0);
+
     HostResponse {
         nic,
         uptime,
@@ -159,5 +179,66 @@ pub fn host(mut ctx: BackendContext) -> HostResponse {
         os_version,
         kernel,
         hostname,
+        dp_version,
+        num_pkgs,
     }
+}
+
+fn parse_software_line(line: &str) -> Option<(SoftwareInfo, bool)> {
+    let mut fields = line.split('|');
+
+    // If software is disabled, this will fail to parse into an int
+    let id = fields.next()?;
+    let id: u16 = id.parse().ok()?;
+
+    let installed = fields.next()?;
+    let installed: u8 = installed.parse().ok()?;
+    let installed = installed > 0;
+
+    let name = fields.next()?.into();
+
+    let desc = fields.next()?.into();
+
+    let deps = fields.next()?.into();
+
+    let docs = fields.next()?.into();
+
+    Some((
+        SoftwareInfo {
+            id,
+            name,
+            desc,
+            deps,
+            docs,
+        },
+        installed,
+    ))
+}
+
+pub fn software(_ctx: BackendContext) -> SoftwareResponse {
+    let cmd_out = Command::new("/boot/dietpi/dietpi-software")
+        .args(["list", "--machine-readable"])
+        .output()
+        .ok();
+    let cmd_out = cmd_out.and_then(|output| String::from_utf8(output.stdout).ok());
+
+    let software_iter = cmd_out
+        .iter()
+        .flat_map(|out| out.lines())
+        .filter_map(parse_software_line);
+
+    let mut resp = SoftwareResponse {
+        installed: Vec::new(),
+        uninstalled: Vec::new(),
+    };
+
+    for (info, installed) in software_iter {
+        if installed {
+            resp.installed.push(info);
+        } else {
+            resp.uninstalled.push(info);
+        }
+    }
+
+    resp
 }

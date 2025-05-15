@@ -31,12 +31,20 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
                     td { (pretty_time) }
                 }
                 tr {
+                    td { "Installed Packages" }
+                    td { (data.num_pkgs) }
+                }
+                tr {
                     td { "OS Version" }
                     td { (data.os_version) }
                 }
                 tr {
                     td { "Kernel Version" }
                     td { (data.kernel) }
+                }
+                tr {
+                    td { "DietPi Version" }
+                    td { (data.dp_version) }
                 }
                 tr {
                     td { "Architecture" }

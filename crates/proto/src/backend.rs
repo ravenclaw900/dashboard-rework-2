@@ -21,6 +21,7 @@ pub enum IdBackendMessage {
     NetIO(NetworkResponse),
     Processes(ProcessResponse),
     Host(HostResponse),
+    Software(SoftwareResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -100,4 +101,21 @@ pub struct HostResponse {
     pub uptime: u64,
     pub kernel: String,
     pub os_version: String,
+    pub dp_version: String,
+    pub num_pkgs: usize,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct SoftwareResponse {
+    pub installed: Vec<SoftwareInfo>,
+    pub uninstalled: Vec<SoftwareInfo>,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct SoftwareInfo {
+    pub id: u16,
+    pub name: String,
+    pub desc: String,
+    pub deps: String,
+    pub docs: String,
 }

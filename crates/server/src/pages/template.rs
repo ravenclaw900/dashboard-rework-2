@@ -45,7 +45,7 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
                     h1 { "DietPi Dashboard" }
 
                     header {
-                        button onclick="body.classList.toggle('nav-closed')" style="display:contents" {
+                        button onclick="body.classList.toggle('nav-closed')" {
                             (Icon::new("fa6-solid-bars").size(48))
                         }
 
@@ -74,12 +74,16 @@ pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, 
 
                     nav {
                         a href="/system" {
-                            (Icon::new("fa6-solid-database"))
+                            (Icon::new("fa6-solid-gauge"))
                             "System"
                         }
                         a href="/process" {
                             (Icon::new("fa6-solid-microchip"))
                             "Processes"
+                        }
+                        a href="/software" {
+                            (Icon::new("fa6-solid-database"))
+                            "Software"
                         }
                         a href="/management" {
                             (Icon::new("fa6-solid-user"))

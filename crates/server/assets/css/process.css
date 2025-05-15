@@ -1,9 +1,4 @@
 .process-table {
-    th {
-        background-color: light-dark(var(--dietpi-light), var(--dietpi-teal-light));
-        height: var(--size-6);
-    }
-
     th button {
         width: 100%;
 

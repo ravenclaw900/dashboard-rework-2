@@ -29,37 +29,46 @@
             const method = (this.getAttribute("method") || "GET").toUpperCase();
             const trigger = this.getAttribute("trigger") || "click";
             const targetAttr = this.getAttribute("target");
+            const disableAttr = this.getAttribute("disable");
 
             const form = this.querySelector("form");
 
             const swap = async (evt) => {
                 evt.preventDefault();
 
-                try {
-                    const options = { method, headers: { "fx-request": "true" } };
-                    let reqUrl = url;
+                const target = !targetAttr ? this : targetAttr === "none" ? null : document.querySelector(targetAttr);
+                const disableEl = document.querySelector(disableAttr);
 
-                    if (form) {
-                        const params = new URLSearchParams(new FormData(form, evt.submitter));
-                        if (method == "GET") {
-                            reqUrl += "?" + params;
-                        } else {
-                            options.body = params;
-                        }
+                const options = { method, headers: { "fx-request": "true" } };
+                let reqUrl = url;
+
+                if (form) {
+                    const params = new URLSearchParams(new FormData(form, evt.submitter));
+                    if (method == "GET") {
+                        reqUrl += "?" + params;
+                    } else {
+                        options.body = params;
                     }
+                }
 
+                if (disableEl)
+                    disableEl.disabled = true;
+
+                try {
                     const resp = await fetch(reqUrl, options);
                     const text = await resp.text();
 
                     if (!resp.ok)
                         throw new Error(`${resp.statusText}: ${text}`);
 
-                    const target = !targetAttr ? this : targetAttr === "none" ? null : document.querySelector(targetAttr);
                     if (target)
                         target.outerHTML = text;
                 } catch (err) {
                     document.querySelector("main").innerText = `Error: ${err.message}`;
                 }
+
+                if (disableEl)
+                    disableEl.disabled = false;
             };
 
             this.addEventListener(trigger, swap);

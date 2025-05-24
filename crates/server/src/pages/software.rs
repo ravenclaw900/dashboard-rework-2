@@ -8,7 +8,7 @@ use super::template::{send_req, template};
 
 fn software_table(list: &[SoftwareInfo], action: &str) -> Markup {
     html! {
-        server-swap trigger="submit" target="#output" method="POST" {
+        server-swap trigger="submit" target="#output" method="POST" disable={"input[value='" (action) "']"} {
             array-form array-name="software" {
                 form {
                     table {
@@ -38,7 +38,7 @@ fn software_table(list: &[SoftwareInfo], action: &str) -> Markup {
                         }
                     }
                     br;
-                    input type="submit" name="action" value=(action);
+                    input .software-input type="submit" name="action" value=(action);
                 }
             }
         }

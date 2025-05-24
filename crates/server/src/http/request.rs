@@ -16,8 +16,8 @@ use hyper::{
 };
 use hyper_util::rt::TokioIo;
 use proto::{
-    backend::IdBackendMessage,
-    frontend::{IdFrontendMessage, NoIdFrontendMessage},
+    backend::ResponseBackendMessage,
+    frontend::{ActionFrontendMessage, RequestFrontendMessage},
 };
 use ring::digest::SHA1_FOR_LEGACY_USE_ONLY;
 use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
@@ -113,33 +113,30 @@ impl ServerRequest {
         })
     }
 
-    pub async fn send_backend_req_with_resp(
+    pub async fn send_backend_req(
         &self,
-        req: IdFrontendMessage,
-    ) -> Result<IdBackendMessage, ServerResponse> {
+        req: RequestFrontendMessage,
+    ) -> Result<ResponseBackendMessage, ServerResponse> {
         let backend_handle = self.extract_backends()?.current_backend.1;
 
-        backend_handle.send_req_with_resp(req).await.map_err(|err| {
+        backend_handle.send_req(req).await.map_err(|err| {
             ServerResponse::new()
                 .status(StatusCode::BAD_GATEWAY)
                 .body(format!("backend request failed: {err}"))
         })
     }
 
-    pub async fn send_backend_req_without_resp(
+    pub async fn send_backend_action(
         &self,
-        msg: NoIdFrontendMessage,
+        msg: ActionFrontendMessage,
     ) -> Result<(), ServerResponse> {
         let backend_handle = self.extract_backends()?.current_backend.1;
 
-        backend_handle
-            .send_req_without_resp(msg)
-            .await
-            .map_err(|err| {
-                ServerResponse::new()
-                    .status(StatusCode::BAD_GATEWAY)
-                    .body(format!("backend action failed: {err}"))
-            })
+        backend_handle.send_action(msg).await.map_err(|err| {
+            ServerResponse::new()
+                .status(StatusCode::BAD_GATEWAY)
+                .body(format!("backend action failed: {err}"))
+        })
     }
 
     pub fn extract_query<Qu: serde::de::DeserializeOwned>(&self) -> Result<Qu, ServerResponse> {
@@ -271,34 +268,5 @@ impl Deref for ServerRequest {
 impl DerefMut for ServerRequest {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.parts
-    }
-}
-
-// Wrapper type that makes de/serialize multiple fields in a query param easier
-#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct QueryArray(pub String);
-
-impl QueryArray {
-    pub fn to_iter<T>(&self) -> impl Iterator<Item = T> + Clone
-    where
-        T: std::str::FromStr,
-    {
-        self.0.split(',').filter_map(|x| x.parse().ok())
-    }
-
-    pub fn from_iter<T, I>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = I>,
-        I: std::fmt::Display,
-    {
-        use core::fmt::Write;
-
-        let mut inner = String::new();
-
-        for item in iter {
-            let _ = write!(inner, "{item},");
-        }
-
-        Self(inner)
     }
 }

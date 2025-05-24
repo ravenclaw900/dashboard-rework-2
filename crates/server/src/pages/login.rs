@@ -55,7 +55,7 @@ pub async fn form(mut req: ServerRequest) -> Result<ServerResponse, ServerRespon
             .redirect(RedirectType::SeeOther, "/")
             .header(
                 header::SET_COOKIE,
-                format!("token={token}; Max-Age=3600; Path=/"),
+                format!("token={token}; Max-Age=3600; Path=/; HttpOnly"),
             ))
     } else {
         Err(ServerResponse::new().redirect(RedirectType::SeeOther, "/login"))

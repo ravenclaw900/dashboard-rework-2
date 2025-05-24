@@ -1,15 +1,12 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    net::IpAddr,
-};
+use std::{collections::VecDeque, net::IpAddr};
 
 use anyhow::{Context, Result, anyhow};
 use config::PROTOCOL_VERSION;
 use log::{error, info, warn};
 use proto::{
     DashboardSocket,
-    backend::{BackendMessage, Handshake, IdBackendMessage, NoIdBackendMessage},
-    frontend::{FrontendMessage, IdFrontendMessage, NoIdFrontendMessage},
+    backend::{ActionBackendMessage, BackendMessage, Handshake, ResponseBackendMessage},
+    frontend::{ActionFrontendMessage, FrontendMessage, RequestFrontendMessage},
 };
 use slab::Slab;
 use tokio::{
@@ -27,12 +24,12 @@ pub struct BackendInfo {
 
 #[derive(Debug)]
 enum BackendRequest {
-    WithResp {
-        req: IdFrontendMessage,
-        resp_tx: oneshot::Sender<IdBackendMessage>,
+    Req {
+        req: RequestFrontendMessage,
+        resp_tx: oneshot::Sender<ResponseBackendMessage>,
     },
-    WithoutResp {
-        msg: NoIdFrontendMessage,
+    Action {
+        msg: ActionFrontendMessage,
     },
     PushTerminalHandle {
         term_tx: mpsc::UnboundedSender<Vec<u8>>,
@@ -102,7 +99,7 @@ impl BackendConnection {
             .read_frame()
             .await
             .and_then(|opt| opt.context("peer disconnected before sending handshake"))?;
-        let BackendMessage::NoId(NoIdBackendMessage::Handshake(handshake)) = message else {
+        let BackendMessage::Action(ActionBackendMessage::Handshake(handshake)) = message else {
             return Err(anyhow!("peer sent invalid message, expected handshake"));
         };
 
@@ -113,7 +110,7 @@ impl BackendConnection {
         &mut self,
         mut rx: mpsc::UnboundedReceiver<BackendRequest>,
     ) -> Result<()> {
-        let mut in_progress: Slab<oneshot::Sender<IdBackendMessage>> = Slab::new();
+        let mut in_progress: Slab<oneshot::Sender<ResponseBackendMessage>> = Slab::new();
         let mut term_txs = Vec::new();
         let mut term_buf = VecDeque::with_capacity(10_000);
         let mut cache = BackendCache::new();
@@ -126,7 +123,7 @@ impl BackendConnection {
                     };
 
                     match conn_req {
-                        BackendRequest::WithResp {req, resp_tx} => {
+                        BackendRequest::Req {req, resp_tx} => {
                             if let Some(data) = cache.get(&req) {
                                 let _ = resp_tx.send(data);
                                 continue;
@@ -135,15 +132,15 @@ impl BackendConnection {
                             // Save response channel so we can send to it when we receive a response
                             let id = in_progress.insert(resp_tx) as u16;
 
-                            let msg = FrontendMessage::Id(id, req);
+                            let msg = FrontendMessage::Request(id, req);
 
                             self.socket
                                 .write_frame(msg)
                                 .await
                                 .context("failed to write request frame")?;
                         },
-                        BackendRequest::WithoutResp { msg } => {
-                            let msg = FrontendMessage::NoId(msg);
+                        BackendRequest::Action { msg } => {
+                            let msg = FrontendMessage::Action(msg);
 
                             self.socket
                                 .write_frame(msg)
@@ -164,7 +161,7 @@ impl BackendConnection {
                     };
 
                     match resp {
-                        BackendMessage::Id(id, data) => {
+                        BackendMessage::Response(id, data) => {
                             let Some(resp_tx) = in_progress.try_remove(id as usize) else {
                                 warn!("Received frame with unknown id {} from {}", id, self.addr);
                                 continue;
@@ -174,13 +171,13 @@ impl BackendConnection {
 
                             let _ = resp_tx.send(data);
                         },
-                        BackendMessage::NoId(msg) => {
+                        BackendMessage::Action(msg) => {
                             match msg {
-                                NoIdBackendMessage::Handshake(_) => {
+                                ActionBackendMessage::Handshake(_) => {
                                     warn!("Received extraneous handshake from backend {}", self.addr);
                                     continue;
                                 },
-                                NoIdBackendMessage::Terminal(data) => {
+                                ActionBackendMessage::Terminal(data) => {
                                     for &x in &data {
                                         if term_buf.len() == term_buf.capacity() {
                                             term_buf.pop_front();
@@ -211,9 +208,9 @@ impl BackendHandle {
         Self { tx }
     }
 
-    pub async fn send_req_with_resp(&self, req: IdFrontendMessage) -> Result<IdBackendMessage> {
+    pub async fn send_req(&self, req: RequestFrontendMessage) -> Result<ResponseBackendMessage> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let req = BackendRequest::WithResp { req, resp_tx };
+        let req = BackendRequest::Req { req, resp_tx };
 
         self.tx
             .send(req)
@@ -226,8 +223,8 @@ impl BackendHandle {
         Ok(resp)
     }
 
-    pub async fn send_req_without_resp(&self, msg: NoIdFrontendMessage) -> Result<()> {
-        let msg = BackendRequest::WithoutResp { msg };
+    pub async fn send_action(&self, msg: ActionFrontendMessage) -> Result<()> {
+        let msg = BackendRequest::Action { msg };
 
         self.tx
             .send(msg)

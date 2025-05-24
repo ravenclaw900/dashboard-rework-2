@@ -29,16 +29,32 @@
             const method = (this.getAttribute("method") || "GET").toUpperCase();
             const trigger = this.getAttribute("trigger") || "click";
             const targetAttr = this.getAttribute("target");
-            const target = !targetAttr ? this : targetAttr === "none" ? null : document.querySelector(targetAttr);
 
-            const swap = async () => {
+            const form = this.querySelector("form");
+
+            const swap = async (evt) => {
+                evt.preventDefault();
+
                 try {
-                    const resp = await fetch(url, { method, headers: { "fx-request": "true" } });
+                    const options = { method, headers: { "fx-request": "true" } };
+                    let reqUrl = url;
+
+                    if (form) {
+                        const params = new URLSearchParams(new FormData(form, evt.submitter));
+                        if (method == "GET") {
+                            reqUrl += "?" + params;
+                        } else {
+                            options.body = params;
+                        }
+                    }
+
+                    const resp = await fetch(reqUrl, options);
                     const text = await resp.text();
 
                     if (!resp.ok)
                         throw new Error(`${resp.statusText}: ${text}`);
 
+                    const target = !targetAttr ? this : targetAttr === "none" ? null : document.querySelector(targetAttr);
                     if (target)
                         target.outerHTML = text;
                 } catch (err) {
@@ -63,6 +79,18 @@
             socket.onmessage = (e) => term.write(new Uint8Array(e.data));
 
             term.onData((data) => socket.send(data));
+        }
+    });
+
+    customElements.define("array-form", class extends HTMLElement {
+        connectedCallback() {
+            const form = this.querySelector("form");
+            const arrayName = this.getAttribute("array-name");
+
+            form.addEventListener("formdata", (e) => {
+                const value = e.formData.getAll(arrayName).join(",");
+                e.formData.set(arrayName, value);
+            })
         }
     });
 })();

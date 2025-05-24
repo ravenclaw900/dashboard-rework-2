@@ -1,14 +1,14 @@
 use bitcode::{Decode, Encode};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Debug, Encode, Decode)]
 pub enum FrontendMessage {
-    Id(u16, IdFrontendMessage),
-    NoId(NoIdFrontendMessage),
+    Request(u16, RequestFrontendMessage),
+    Action(ActionFrontendMessage),
 }
 
 #[derive(Debug, Encode, Decode)]
-pub enum IdFrontendMessage {
+pub enum RequestFrontendMessage {
     Cpu,
     Temp,
     Mem,
@@ -17,10 +17,11 @@ pub enum IdFrontendMessage {
     Processes,
     Host,
     Software,
+    Command(CommandAction),
 }
 
 #[derive(Debug, Encode, Decode)]
-pub enum NoIdFrontendMessage {
+pub enum ActionFrontendMessage {
     Terminal(Vec<u8>),
     Signal(SignalAction),
 }
@@ -31,11 +32,17 @@ pub struct SignalAction {
     pub signal: Signal,
 }
 
-#[derive(Debug, Encode, Decode, Deserialize)]
+#[derive(Debug, Encode, Decode, Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Signal {
     Term,
     Pause,
     Resume,
     Kill,
+}
+
+#[derive(Debug, Encode, Decode)]
+pub struct CommandAction {
+    pub cmd: String,
+    pub args: Vec<String>,
 }

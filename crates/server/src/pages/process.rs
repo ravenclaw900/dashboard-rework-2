@@ -2,13 +2,13 @@ use maud::{Markup, html};
 use pretty_bytes_typed::pretty_bytes_binary;
 use proto::{
     backend::ProcessStatus,
-    frontend::{NoIdFrontendMessage, SignalAction},
+    frontend::{ActionFrontendMessage, SignalAction},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::http::{request::ServerRequest, response::ServerResponse};
 
-use super::template::{Icon, fetch_data, template};
+use super::template::{Icon, send_req, template};
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(default)]
@@ -36,7 +36,7 @@ fn table_header(name: &str, sort: ColumnSort, query: &ProcessQuery) -> Markup {
     };
 
     let new_query = ProcessQuery { sort, reverse };
-    let new_query = serde_urlencoded::to_string(new_query).unwrap();
+    let new_query = serde_urlencoded::to_string(&new_query).unwrap();
 
     html! {
         th {
@@ -61,7 +61,7 @@ pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> 
 
     let query: ProcessQuery = req.extract_query()?;
 
-    let mut processes = fetch_data!(req, Processes)?.processes;
+    let mut processes = send_req!(req, Processes)?.processes;
     match query.sort {
         ColumnSort::Pid => processes.sort_by_key(|a| a.pid),
         ColumnSort::Name => processes.sort_by(|a, b| a.name.cmp(&b.name)),
@@ -132,7 +132,7 @@ pub async fn signal(req: ServerRequest) -> Result<ServerResponse, ServerResponse
 
     let signal: SignalAction = req.extract_query()?;
 
-    req.send_backend_req_without_resp(NoIdFrontendMessage::Signal(signal))
+    req.send_backend_action(ActionFrontendMessage::Signal(signal))
         .await?;
 
     Ok(ServerResponse::new())

@@ -1,8 +1,12 @@
 use std::{fs, path::PathBuf, process::Command};
 
-use proto::backend::{
-    CpuResponse, DiskInfo, DiskResponse, HostResponse, MemResponse, NetworkResponse, ProcessInfo,
-    ProcessResponse, ProcessStatus, SoftwareInfo, SoftwareResponse, TempResponse, UsageData,
+use proto::{
+    backend::{
+        CommandResponse, CpuResponse, DiskInfo, DiskResponse, HostResponse, MemResponse,
+        NetworkResponse, ProcessInfo, ProcessResponse, ProcessStatus, SoftwareInfo,
+        SoftwareResponse, TempResponse, UsageData,
+    },
+    frontend::CommandAction,
 };
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
@@ -241,4 +245,14 @@ pub fn software(_ctx: BackendContext) -> SoftwareResponse {
     }
 
     resp
+}
+
+pub fn command(_ctx: BackendContext, action: CommandAction) -> CommandResponse {
+    let output = Command::new(action.cmd)
+        .args(&action.args)
+        .output()
+        .map(|out| out.stdout)
+        .unwrap_or_else(|err| format!("command execution failed: {err}").into());
+
+    CommandResponse { output }
 }

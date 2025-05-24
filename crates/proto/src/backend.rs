@@ -2,18 +2,18 @@ use bitcode::{Decode, Encode};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub enum BackendMessage {
-    NoId(NoIdBackendMessage),
-    Id(u16, IdBackendMessage),
+    Action(ActionBackendMessage),
+    Response(u16, ResponseBackendMessage),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
-pub enum NoIdBackendMessage {
+pub enum ActionBackendMessage {
     Handshake(Handshake),
     Terminal(Vec<u8>),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
-pub enum IdBackendMessage {
+pub enum ResponseBackendMessage {
     Cpu(CpuResponse),
     Temp(TempResponse),
     Mem(MemResponse),
@@ -22,6 +22,7 @@ pub enum IdBackendMessage {
     Processes(ProcessResponse),
     Host(HostResponse),
     Software(SoftwareResponse),
+    Command(CommandResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -118,4 +119,9 @@ pub struct SoftwareInfo {
     pub desc: String,
     pub deps: String,
     pub docs: String,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct CommandResponse {
+    pub output: Vec<u8>,
 }

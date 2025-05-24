@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use config::PROTOCOL_VERSION;
 use proto::{
     DashboardSocket,
-    backend::{BackendMessage, Handshake, IdBackendMessage, NoIdBackendMessage},
-    frontend::{FrontendMessage, IdFrontendMessage, NoIdFrontendMessage},
+    backend::{ActionBackendMessage, BackendMessage, Handshake, ResponseBackendMessage},
+    frontend::{ActionFrontendMessage, FrontendMessage, RequestFrontendMessage},
 };
 use sysinfo::{Components, Disks, Networks, System};
 use tokio::{net::TcpStream, sync::mpsc};
@@ -14,12 +14,12 @@ use crate::{SharedConfig, actions, getters};
 
 macro_rules! getters {
     ($req:expr, $ctx:expr, {
-        $( $variant:ident => $fn:path, )*
+        $( $variant:ident $(($data:ident))? => $fn:expr, )*
     }) => {
         match $req {
-            $( IdFrontendMessage::$variant => {
-                let data = tokio::task::spawn_blocking(move || $fn($ctx)).await.unwrap();
-                IdBackendMessage::$variant(data)
+            $( RequestFrontendMessage::$variant $(($data))? => {
+                let data = tokio::task::spawn_blocking(move || $fn($ctx $(, $data)?)).await.unwrap();
+                ResponseBackendMessage::$variant(data)
             } )*
         }
     };
@@ -112,8 +112,8 @@ impl BackendClient {
             version: PROTOCOL_VERSION,
         };
 
-        let msg = NoIdBackendMessage::Handshake(handshake);
-        let msg = BackendMessage::NoId(msg);
+        let msg = ActionBackendMessage::Handshake(handshake);
+        let msg = BackendMessage::Action(msg);
 
         self.socket
             .write_frame(msg)
@@ -136,7 +136,7 @@ impl RequestHandler {
         let ctx = self.context.clone();
 
         match self.req {
-            FrontendMessage::Id(id, req) => {
+            FrontendMessage::Request(id, req) => {
                 let resp = getters!(req, ctx, {
                     Cpu => getters::cpu,
                     Temp => getters::temp,
@@ -146,19 +146,22 @@ impl RequestHandler {
                     Processes => getters::processes,
                     Host => getters::host,
                     Software => getters::software,
+                    Command(action) => getters::command,
                 });
 
-                let resp = BackendMessage::Id(id, resp);
+                let resp = BackendMessage::Response(id, resp);
                 let _ = self.context.socket_tx.send(resp);
             }
-            FrontendMessage::NoId(NoIdFrontendMessage::Terminal(msg)) => {
-                let _ = self.context.term_tx.send(msg);
-            }
-            FrontendMessage::NoId(NoIdFrontendMessage::Signal(action)) => {
-                tokio::task::spawn_blocking(|| actions::process_signal(ctx, action))
-                    .await
-                    .unwrap();
-            }
+            FrontendMessage::Action(msg) => match msg {
+                ActionFrontendMessage::Terminal(data) => {
+                    let _ = self.context.term_tx.send(data);
+                }
+                ActionFrontendMessage::Signal(action) => {
+                    tokio::task::spawn_blocking(|| actions::process_signal(ctx, action))
+                        .await
+                        .unwrap()
+                }
+            },
         }
     }
 }

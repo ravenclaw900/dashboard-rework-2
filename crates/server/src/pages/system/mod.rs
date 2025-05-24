@@ -1,12 +1,9 @@
 use maud::html;
 use serde::{Deserialize, Serialize};
 
-use crate::http::{
-    request::{QueryArray, ServerRequest},
-    response::ServerResponse,
-};
+use crate::http::{query_array::QueryArray, request::ServerRequest, response::ServerResponse};
 
-use super::template::{fetch_data, template};
+use super::template::{send_req, template};
 
 mod fragments;
 mod graph;
@@ -25,44 +22,24 @@ pub struct SystemQuery {
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
     req.check_login()?;
 
-    let query: SystemQuery = req.extract_query()?;
+    let mut query: SystemQuery = req.extract_query()?;
 
-    let cpu_data = fetch_data!(req, Cpu)?;
-    let temp_data = fetch_data!(req, Temp)?;
-    let mem_data = fetch_data!(req, Mem)?;
-    let disk_data = fetch_data!(req, Disk)?;
-    let net_data = fetch_data!(req, NetIO)?;
+    let cpu_data = send_req!(req, Cpu)?;
+    let temp_data = send_req!(req, Temp)?;
+    let mem_data = send_req!(req, Mem)?;
+    let disk_data = send_req!(req, Disk)?;
+    let net_data = send_req!(req, NetIO)?;
 
     let cpu_meters = fragments::cpu_meters(&cpu_data, &temp_data);
     let mem_meters = fragments::mem_meters(&mem_data);
     let disk_meters = fragments::disk_meters(&disk_data);
 
-    let (cpu_graph, cpu_points) = fragments::cpu_graph(&cpu_data, query.cpu_points.to_iter());
-    let (temp_graph, temp_points) =
-        fragments::temp_graph(&temp_data, query.temp_points.to_iter()).unzip();
-    let (mem_graph, ram_points, swap_points) = fragments::mem_graph(
-        &mem_data,
-        query.ram_points.to_iter(),
-        query.swap_points.to_iter(),
-    );
-    let (net_graph, sent_points, recv_points) = fragments::net_graph(
-        &net_data,
-        query.sent_points.to_iter(),
-        query.recv_points.to_iter(),
-    );
+    let cpu_graph = fragments::cpu_graph(&cpu_data, &mut query.cpu_points);
+    let temp_graph = fragments::temp_graph(&temp_data, &mut query.temp_points);
+    let mem_graph = fragments::mem_graph(&mem_data, &mut query.ram_points, &mut query.swap_points);
+    let net_graph = fragments::net_graph(&net_data, &mut query.sent_points, &mut query.recv_points);
 
-    let temp_points = temp_points.into_iter().flatten();
-
-    let new_query = SystemQuery {
-        cpu_points: QueryArray::from_iter(cpu_points),
-        temp_points: QueryArray::from_iter(temp_points),
-        ram_points: QueryArray::from_iter(ram_points),
-        swap_points: QueryArray::from_iter(swap_points),
-        sent_points: QueryArray::from_iter(sent_points),
-        recv_points: QueryArray::from_iter(recv_points),
-    };
-
-    let new_query = serde_urlencoded::to_string(new_query).unwrap();
+    let new_query = serde_urlencoded::to_string(&query).unwrap();
 
     let content = html! {
         server-swap .card-grid action={"/system?" (new_query)} trigger="delay" {

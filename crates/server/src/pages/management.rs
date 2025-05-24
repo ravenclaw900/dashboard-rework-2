@@ -4,12 +4,12 @@ use maud::html;
 
 use crate::http::{request::ServerRequest, response::ServerResponse};
 
-use super::template::{fetch_data, template};
+use super::template::{send_req, template};
 
 pub async fn page(req: ServerRequest) -> Result<ServerResponse, ServerResponse> {
     req.check_login()?;
 
-    let data = fetch_data!(req, Host)?;
+    let data = send_req!(req, Host)?;
 
     let pretty_time = humantime::format_duration(Duration::from_secs(data.uptime));
 

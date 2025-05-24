@@ -1,14 +1,14 @@
 use std::time::Duration;
 
 use ephemeropt::EphemeralOption;
-use proto::{backend::IdBackendMessage, frontend::IdFrontendMessage};
+use proto::{backend::ResponseBackendMessage, frontend::RequestFrontendMessage};
 
 const CACHE_DURATION: Duration = Duration::from_millis(1500);
 
 macro_rules! cache {
     ($name:ident, [$($key:ident: $discrim:ident),*]) => {
         pub struct $name {
-            $( $key: EphemeralOption<IdBackendMessage> ),*
+            $( $key: EphemeralOption<ResponseBackendMessage> ),*
         }
 
         impl $name {
@@ -18,16 +18,16 @@ macro_rules! cache {
                 }
             }
 
-            pub fn get(&self, key: &IdFrontendMessage) -> Option<IdBackendMessage> {
+            pub fn get(&self, key: &RequestFrontendMessage) -> Option<ResponseBackendMessage> {
                 match key {
-                    $( IdFrontendMessage::$discrim => self.$key.get().cloned(), )*
+                    $( RequestFrontendMessage::$discrim => self.$key.get().cloned(), )*
                     _ => None,
                 }
             }
 
-            pub fn insert(&mut self, val: IdBackendMessage) {
+            pub fn insert(&mut self, val: ResponseBackendMessage) {
                 match val {
-                    $( IdBackendMessage::$discrim(_) => { self.$key.insert(val); }, )*
+                    $( ResponseBackendMessage::$discrim(_) => { self.$key.insert(val); }, )*
                     _ => {}
                 };
             }

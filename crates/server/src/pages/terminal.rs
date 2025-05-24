@@ -1,7 +1,7 @@
 use maud::html;
 
 use futures_util::{SinkExt, StreamExt};
-use proto::frontend::NoIdFrontendMessage;
+use proto::frontend::ActionFrontendMessage;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::http::{request::ServerRequest, response::ServerResponse};
@@ -46,9 +46,9 @@ pub async fn socket(req: ServerRequest) -> Result<ServerResponse, ServerResponse
                     };
                     let data = data.into_data().to_vec();
 
-                    let msg = NoIdFrontendMessage::Terminal(data);
+                    let msg = ActionFrontendMessage::Terminal(data);
 
-                    if backend.send_req_without_resp(msg).await.is_err() {
+                    if backend.send_action(msg).await.is_err() {
                         break;
                     }
                 }

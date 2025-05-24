@@ -1,10 +1,7 @@
-use std::{
-    net::{Ipv6Addr, SocketAddr},
-    sync::{Arc, Mutex},
-};
+use std::net::{Ipv6Addr, SocketAddr};
 
 use anyhow::{Context, Result};
-use auth::{LoginMap, SharedLoginMap};
+use auth::SharedLoginMap;
 use flexible_hyper_server_tls::{HttpOrHttpsAcceptor, rustls_helpers};
 use hyper::service::service_fn;
 use log::{error, info};
@@ -15,6 +12,7 @@ use tokio::net::TcpListener;
 use crate::{SharedConfig, backend::SharedBackendRegistry};
 
 pub mod auth;
+pub mod query_array;
 pub mod request;
 pub mod response;
 mod router;

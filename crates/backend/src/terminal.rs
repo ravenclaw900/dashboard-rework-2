@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use proto::backend::{BackendMessage, NoIdBackendMessage};
+use proto::backend::{ActionBackendMessage, BackendMessage};
 use pty_process::{Command, Pty, Size};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -57,8 +57,8 @@ impl Terminal {
                             break;
                         }
 
-                        let msg = NoIdBackendMessage::Terminal(buf[..n].to_vec());
-                        let msg = BackendMessage::NoId(msg);
+                        let msg = ActionBackendMessage::Terminal(buf[..n].to_vec());
+                        let msg = BackendMessage::Action(msg);
 
                         let _ = self.socket_tx.send(msg);
                     }

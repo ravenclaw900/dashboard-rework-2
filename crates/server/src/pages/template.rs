@@ -2,24 +2,24 @@ use hyper::header;
 use maud::{DOCTYPE, Markup, Render, html};
 
 use crate::http::{
-    request::{BackendData, QueryArray, ServerRequest},
+    request::{BackendData, ServerRequest},
     response::ServerResponse,
 };
 
-macro_rules! fetch_data {
-    ($req:expr, $variant:ident) => {{
-        use proto::{backend::IdBackendMessage, frontend::IdFrontendMessage};
+macro_rules! send_req {
+    ($req:expr, $variant:ident $(($data:expr))?) => {{
+        use proto::{backend::ResponseBackendMessage, frontend::RequestFrontendMessage};
 
-        $req.send_backend_req_with_resp(IdFrontendMessage::$variant)
+        $req.send_backend_req(RequestFrontendMessage::$variant $(($data))?)
             .await
             .map(|resp| match resp {
-                IdBackendMessage::$variant(resp) => resp,
+                ResponseBackendMessage::$variant(resp) => resp,
                 _ => unreachable!(),
             })
     }};
 }
 
-pub(crate) use fetch_data;
+pub(crate) use send_req;
 
 pub fn template(req: &ServerRequest, content: Markup) -> Result<ServerResponse, ServerResponse> {
     let page = if req.is_fixi() {

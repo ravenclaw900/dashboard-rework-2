@@ -2,6 +2,8 @@ use maud::{Markup, html};
 use pretty_bytes_typed::{pretty_bytes, pretty_bytes_binary};
 use proto::backend::{CpuResponse, DiskResponse, MemResponse, NetworkResponse, TempResponse};
 
+use crate::http::query_array::QueryArray;
+
 use super::graph::{Axis, SvgGraph};
 
 fn calc_percent(used: u64, total: u64) -> f32 {
@@ -45,45 +47,43 @@ pub fn cpu_meters(cpu_data: &CpuResponse, temp_data: &TempResponse) -> Markup {
     }
 }
 
-pub fn cpu_graph(
-    data: &CpuResponse,
-    old_points: impl Iterator<Item = f32> + Clone,
-) -> (Markup, impl Iterator<Item = f32>) {
+pub fn cpu_graph(data: &CpuResponse, points: &mut QueryArray) -> Markup {
     let mut graph = SvgGraph::new(Axis::Percent);
 
-    let points = std::iter::once(data.global_cpu).chain(old_points).take(20);
-    graph.add_series(points.clone(), "var(--green-6)");
+    let points_iter = std::iter::once(data.global_cpu)
+        .chain(points.iter())
+        .take(20);
 
-    let content = html! {
+    graph.add_series(points_iter.clone(), "var(--green-6)");
+
+    *points = points_iter.collect();
+
+    html! {
         section .span-3
         {
             h2 { "CPU Graph" }
             (graph)
         }
-    };
-
-    (content, points)
+    }
 }
 
-pub fn temp_graph(
-    data: &TempResponse,
-    old_points: impl Iterator<Item = f32> + Clone,
-) -> Option<(Markup, impl Iterator<Item = f32>)> {
+pub fn temp_graph(data: &TempResponse, points: &mut QueryArray) -> Option<Markup> {
     data.temp.map(|temp| {
         let mut graph = SvgGraph::new(Axis::Temp);
 
-        let points = std::iter::once(temp).chain(old_points).take(20);
-        graph.add_series(points.clone(), "light-dark(#000, #fff)");
+        let points_iter = std::iter::once(temp).chain(points.iter()).take(20);
 
-        let content = html! {
+        graph.add_series(points_iter.clone(), "light-dark(#000, #fff)");
+
+        *points = points_iter.collect();
+
+        html! {
                 section .span-3
                 {
                     h2 { "Temperature Graph" }
                     (graph)
                 }
-        };
-
-        (content, points)
+        }
     })
 }
 
@@ -115,28 +115,33 @@ pub fn mem_meters(data: &MemResponse) -> Markup {
 
 pub fn mem_graph(
     data: &MemResponse,
-    ram_points: impl Iterator<Item = f32> + Clone,
-    swap_points: impl Iterator<Item = f32> + Clone,
-) -> (Markup, impl Iterator<Item = f32>, impl Iterator<Item = f32>) {
+    ram_points: &mut QueryArray,
+    swap_points: &mut QueryArray,
+) -> Markup {
     let mut graph = SvgGraph::new(Axis::Percent);
 
     let ram_percent = calc_percent(data.ram.used, data.ram.total);
     let swap_percent = calc_percent(data.swap.used, data.swap.total);
 
-    let ram_points = std::iter::once(ram_percent).chain(ram_points).take(20);
-    let swap_points = std::iter::once(swap_percent).chain(swap_points).take(20);
+    let ram_points_iter = std::iter::once(ram_percent)
+        .chain(ram_points.iter())
+        .take(20);
+    let swap_points_iter = std::iter::once(swap_percent)
+        .chain(swap_points.iter())
+        .take(20);
 
-    graph.add_series(ram_points.clone(), "var(--red-6)");
-    graph.add_series(swap_points.clone(), "var(--blue-6)");
+    graph.add_series(ram_points_iter.clone(), "var(--red-6)");
+    graph.add_series(swap_points_iter.clone(), "var(--blue-6)");
 
-    let content = html! {
+    *ram_points = ram_points_iter.collect();
+    *swap_points = swap_points_iter.collect();
+
+    html! {
         section .span-3 {
             h2 { "Memory Graph" }
             (graph)
         }
-    };
-
-    (content, ram_points, swap_points)
+    }
 }
 
 pub fn disk_meters(data: &DiskResponse) -> Markup {
@@ -162,27 +167,28 @@ pub fn disk_meters(data: &DiskResponse) -> Markup {
 
 pub fn net_graph(
     data: &NetworkResponse,
-    sent_points: impl Iterator<Item = f32> + Clone,
-    recv_points: impl Iterator<Item = f32> + Clone,
-) -> (Markup, impl Iterator<Item = f32>, impl Iterator<Item = f32>) {
+    sent_points: &mut QueryArray,
+    recv_points: &mut QueryArray,
+) -> Markup {
     let mut graph = SvgGraph::new(Axis::Bytes);
 
-    let sent_points = std::iter::once(data.sent as f32)
-        .chain(sent_points)
+    let sent_points_iter = std::iter::once(data.sent as f32)
+        .chain(sent_points.iter())
         .take(20);
-    let recv_points = std::iter::once(data.recv as f32)
-        .chain(recv_points)
+    let recv_points_iter = std::iter::once(data.recv as f32)
+        .chain(recv_points.iter())
         .take(20);
 
-    graph.add_series(sent_points.clone(), "var(--purple-6)");
-    graph.add_series(recv_points.clone(), "var(--pink-6)");
+    graph.add_series(sent_points_iter.clone(), "var(--purple-6)");
+    graph.add_series(recv_points_iter.clone(), "var(--pink-6)");
 
-    let content = html! {
+    *sent_points = sent_points_iter.collect();
+    *recv_points = recv_points_iter.collect();
+
+    html! {
         section .span-3 {
             h2 { "Network Graph" }
             (graph)
         }
-    };
-
-    (content, sent_points, recv_points)
+    }
 }

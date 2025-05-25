@@ -147,6 +147,7 @@ impl RequestHandler {
                     Host => getters::host,
                     Software => getters::software,
                     Command(action) => getters::command,
+                    Services => getters::services,
                 });
 
                 let resp = BackendMessage::Response(id, resp);

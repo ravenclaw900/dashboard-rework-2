@@ -3,8 +3,8 @@ use std::{fs, path::PathBuf, process::Command};
 use proto::{
     backend::{
         CommandResponse, CpuResponse, DiskInfo, DiskResponse, HostResponse, MemResponse,
-        NetworkResponse, ProcessInfo, ProcessResponse, ProcessStatus, SoftwareInfo,
-        SoftwareResponse, TempResponse, UsageData,
+        NetworkResponse, ProcessInfo, ProcessResponse, ProcessStatus, ServiceInfo, ServiceResponse,
+        ServiceStatus, SoftwareInfo, SoftwareResponse, TempResponse, UsageData,
     },
     frontend::CommandAction,
 };
@@ -191,8 +191,10 @@ pub fn host(mut ctx: BackendContext) -> HostResponse {
 fn parse_software_line(line: &str) -> Option<(SoftwareInfo, bool)> {
     let mut fields = line.split('|');
 
-    // If software is disabled, this will fail to parse into an int
     let id = fields.next()?;
+    if id.contains("DISABLED") {
+        return None;
+    }
     let id: u16 = id.parse().ok()?;
 
     let installed = fields.next()?;
@@ -247,12 +249,95 @@ pub fn software(_ctx: BackendContext) -> SoftwareResponse {
     resp
 }
 
+fn remove_escape_codes(s: impl Iterator<Item = u8>) -> Vec<u8> {
+    s.scan(false, |in_escape, c| {
+        if *in_escape {
+            if c.is_ascii_alphabetic() {
+                *in_escape = false;
+            }
+            Some(None)
+        } else if c == b'\x1b' {
+            *in_escape = true;
+            Some(None)
+        } else {
+            Some(Some(c))
+        }
+    })
+    .filter_map(|c| c)
+    .collect()
+}
+
 pub fn command(_ctx: BackendContext, action: CommandAction) -> CommandResponse {
     let output = Command::new(action.cmd)
         .args(&action.args)
         .output()
-        .map(|out| out.stdout)
+        .map(|out| out.stdout.into_iter())
+        .map(remove_escape_codes)
         .unwrap_or_else(|err| format!("command execution failed: {err}").into());
 
     CommandResponse { output }
+}
+
+fn services_helper() -> Option<ServiceResponse> {
+    let output = Command::new("/boot/dietpi/dietpi-services")
+        .arg("status")
+        .output()
+        .ok()?;
+
+    let stdout = remove_escape_codes(output.stdout.into_iter());
+    let stdout = std::str::from_utf8(&stdout).ok()?;
+
+    let stderr = remove_escape_codes(output.stderr.into_iter());
+    let stderr = std::str::from_utf8(&stderr).ok()?;
+
+    let ok_services = stdout
+        .lines()
+        .map(|line| {
+            line.trim_start_matches("[  OK  ]")
+                .trim_start_matches("[ INFO ]")
+                .trim_start_matches(" DietPi-Services |")
+        })
+        .filter_map(|line| line.split_once('\t'))
+        .map(|(name, statusdate)| {
+            let statusdate = statusdate.trim();
+            let (status, date) = statusdate.split_once(" since ").unzip();
+            (name, status.unwrap_or(statusdate), date.unwrap_or_default())
+        })
+        .map(|(name, status, date)| {
+            let status = match status {
+                "active (running)" | "active (exited)" => ServiceStatus::Active,
+                "inactive (dead)" => ServiceStatus::Inactive,
+                _ => ServiceStatus::Unknown,
+            };
+
+            ServiceInfo {
+                name: name.into(),
+                status,
+                start: date.into(),
+                err_log: String::new(),
+            }
+        });
+
+    let failed_services = stderr
+        .split("[FAILED] DietPi-Services | ×")
+        .filter_map(|desc| desc.split_once(".service"))
+        .filter_map(|(name, rest)| rest.split_once("\n\n").map(|(_, err_log)| (name, err_log)))
+        .map(|(name, err_log)| ServiceInfo {
+            name: name.into(),
+            status: ServiceStatus::Failed,
+            start: String::new(),
+            err_log: err_log.into(),
+        });
+
+    let mut services = Vec::new();
+    services.extend(ok_services);
+    services.extend(failed_services);
+
+    Some(ServiceResponse { services })
+}
+
+pub fn services(_ctx: BackendContext) -> ServiceResponse {
+    services_helper().unwrap_or_else(|| ServiceResponse {
+        services: Vec::new(),
+    })
 }

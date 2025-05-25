@@ -18,6 +18,7 @@ pub enum RequestFrontendMessage {
     Host,
     Software,
     Command(CommandAction),
+    Services,
 }
 
 #[derive(Debug, Encode, Decode)]

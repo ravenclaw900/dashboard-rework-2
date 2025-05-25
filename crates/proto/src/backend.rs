@@ -23,6 +23,7 @@ pub enum ResponseBackendMessage {
     Host(HostResponse),
     Software(SoftwareResponse),
     Command(CommandResponse),
+    Services(ServiceResponse),
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
@@ -124,4 +125,25 @@ pub struct SoftwareInfo {
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct CommandResponse {
     pub output: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct ServiceResponse {
+    pub services: Vec<ServiceInfo>,
+}
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct ServiceInfo {
+    pub name: String,
+    pub status: ServiceStatus,
+    pub start: String,
+    pub err_log: String,
+}
+
+#[derive(Debug, Clone, Copy, Encode, Decode)]
+pub enum ServiceStatus {
+    Active,
+    Inactive,
+    Failed,
+    Unknown,
 }
